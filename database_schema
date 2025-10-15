@@ -1,0 +1,178 @@
+--
+-- Database: `SmartLWA`
+--
+-- This script creates the necessary tables for the Smart Library Web Application (SmartLWA)
+-- It uses InnoDB engine for transaction support and Foreign Key constraints.
+--
+
+-- 1. DATABASE CREATION
+-- Run this first to create the database (if it doesn't already exist)
+CREATE DATABASE IF NOT EXISTS `SmartLWA` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+USE `SmartLWA`;
+
+-- --------------------------------------------------------
+
+-- 2. ACADEMIC PERIODS TABLE
+-- Used to define the current semester/year for reporting and policies.
+CREATE TABLE `AcademicPeriods` (
+  `period_id` INT(11) AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(100) NOT NULL COMMENT 'e.g., Spring 2025, First Semester',
+  `start_date` DATE NOT NULL,
+  `end_date` DATE NOT NULL,
+  `is_active` BOOLEAN DEFAULT TRUE COMMENT 'Only one period should be active at a time.',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+-- 3. USERS TABLE
+-- Central table for all members: Students, Teachers, Librarians, and Staff.
+CREATE TABLE `Users` (
+  `user_id` INT(11) AUTO_INCREMENT PRIMARY KEY,
+  `unique_id` VARCHAR(50) UNIQUE NOT NULL COMMENT 'Student ID, Employee Code, etc.',
+  `first_name` VARCHAR(100) NOT NULL,
+  `last_name` VARCHAR(100) NOT NULL,
+  `email` VARCHAR(100) UNIQUE NOT NULL,
+  `password_hash` VARCHAR(255) NOT NULL COMMENT 'Stores the secure hash of the password.',
+  `role` ENUM('student', 'teacher', 'librarian', 'staff') NOT NULL,
+  `is_active` BOOLEAN DEFAULT TRUE,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+-- 4. BOOKS TABLE
+-- Inventory of all books in the library (The master record/title).
+CREATE TABLE `Books` (
+  `book_id` INT(11) AUTO_INCREMENT PRIMARY KEY,
+  `isbn` VARCHAR(20) UNIQUE,
+  `title` VARCHAR(255) NOT NULL,
+  `author` VARCHAR(255) NOT NULL,
+  `publisher` VARCHAR(150),
+  `publication_year` YEAR(4),
+  `price` DECIMAL(10, 2) NULL COMMENT 'Price of the book in your currency',
+  `cover_image_url` VARCHAR(512) NULL COMMENT 'URL fetched from Google Books API for cover image.',
+  `total_copies` INT(11) NOT NULL DEFAULT 1 COMMENT 'Total number of physical copies (maintained by application or trigger).',
+  `archived` BOOLEAN DEFAULT FALSE COMMENT 'Set to true if title is removed from circulation',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+-- 5. BOOK COPIES TABLE (NEW ENTITY for Concurrent Borrowing)
+-- Tracks each physical copy of a book. This enables tracking specific item status.
+CREATE TABLE `BookCopies` (
+  `copy_id` INT(11) AUTO_INCREMENT PRIMARY KEY,
+  `book_id` INT(11) NOT NULL,
+  `call_number` VARCHAR(50) UNIQUE NOT NULL COMMENT 'Unique identifier for physical item location (e.g., FIC SAL C1-01, FIC SAL C1-02)',
+  `barcode` VARCHAR(100) UNIQUE NOT NULL COMMENT 'Scannable unique identifier for the specific copy',
+  `status` ENUM('available', 'on_loan', 'in_repair', 'lost', 'withdrawn') NOT NULL DEFAULT 'available',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  
+  -- Foreign Key Constraint
+  FOREIGN KEY (`book_id`) REFERENCES `Books`(`book_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+-- 6. BORROWING RECORDS TABLE
+-- Tracks all borrowing activities. Now links to the specific physical copy (`copy_id`).
+CREATE TABLE `BorrowingRecords` (
+  `record_id` INT(11) AUTO_INCREMENT PRIMARY KEY,
+  `copy_id` INT(11) NOT NULL COMMENT 'The specific physical book copy that was borrowed.',
+  `user_id` INT(11) NOT NULL,
+  `borrow_date` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `due_date` DATE NOT NULL,
+  `return_date` DATETIME NULL COMMENT 'NULL if the book is still out',
+  `status` ENUM('borrowed', 'returned', 'overdue') NOT NULL DEFAULT 'borrowed',
+  
+  -- Foreign Key Constraints
+  FOREIGN KEY (`copy_id`) REFERENCES `BookCopies`(`copy_id`) ON DELETE RESTRICT,
+  FOREIGN KEY (`user_id`) REFERENCES `Users`(`user_id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+-- 7. RESERVATIONS TABLE
+-- Tracks books reserved by users. Still links to `book_id` (the title, not a specific copy).
+CREATE TABLE `Reservations` (
+  `reservation_id` INT(11) AUTO_INCREMENT PRIMARY KEY,
+  `book_id` INT(11) NOT NULL,
+  `user_id` INT(11) NOT NULL,
+  `reservation_date` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `expiry_date` DATETIME NOT NULL COMMENT 'Date when reservation is automatically cancelled if not picked up',
+  `status` ENUM('active', 'ready_for_pickup', 'fulfilled', 'cancelled') NOT NULL DEFAULT 'active',
+  
+  -- Prevent same user from reserving the same book twice (if status is active/ready)
+  UNIQUE KEY `user_book_active_reservation` (`user_id`, `book_id`),
+  
+  -- Foreign Key Constraints
+  FOREIGN KEY (`book_id`) REFERENCES `Books`(`book_id`) ON DELETE RESTRICT,
+  FOREIGN KEY (`user_id`) REFERENCES `Users`(`user_id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+-- 8. PENALTIES TABLE
+-- Tracks fines and charges incurred by users.
+CREATE TABLE `Penalties` (
+  `penalty_id` INT(11) AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT(11) NOT NULL,
+  `record_id` INT(11) NULL COMMENT 'Links penalty to a specific borrowing record (e.g., overdue fine)',
+  `amount` DECIMAL(10, 2) NOT NULL,
+  `reason` VARCHAR(255) NOT NULL COMMENT 'e.g., Overdue, Book Damage, Lost Book',
+  `is_paid` BOOLEAN DEFAULT FALSE,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  
+  -- Foreign Key Constraints
+  FOREIGN KEY (`user_id`) REFERENCES `Users`(`user_id`) ON DELETE RESTRICT,
+  FOREIGN KEY (`record_id`) REFERENCES `BorrowingRecords`(`record_id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+-- 9. PAYMENTS TABLE
+-- Records successful payments made by users to clear penalties.
+CREATE TABLE `Payments` (
+  `payment_id` INT(11) AUTO_INCREMENT PRIMARY KEY,
+  `penalty_id` INT(11) NOT NULL,
+  `user_id` INT(11) NOT NULL,
+  `amount_paid` DECIMAL(10, 2) NOT NULL,
+  `payment_date` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `method` VARCHAR(50) COMMENT 'e.g., Cash, G-Cash, Credit Card',
+  
+  -- Foreign Key Constraints
+  FOREIGN KEY (`penalty_id`) REFERENCES `Penalties`(`penalty_id`) ON DELETE RESTRICT,
+  FOREIGN KEY (`user_id`) REFERENCES `Users`(`user_id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+-- 10. DUMMY DATA FOR TESTING (Adjusted for BookCopies)
+
+-- Insert Users (Same as before)
+INSERT INTO `Users` (`unique_id`, `first_name`, `last_name`, `email`, `password_hash`, `role`) VALUES
+('L1001', 'Admin', 'Librarian', 'lib.admin@lwa.edu', '$2y$10$iN6r0K7J.sP.pU0k3A.J4.uZ4W3e.f9L1D3z2hO1bH3gL7kY2S4t', 'librarian'), -- Password: password123
+('S2001', 'Test', 'Student', 'test.student@lwa.edu', '$2y$10$iN6r0K7J.sP.pU0k3A.J4.uZ4W3e.f9L1D3z2hO1bH3gL7kY2S4t', 'student'); -- Password: password123
+
+-- Insert Academic Period (Same as before)
+INSERT INTO `AcademicPeriods` (`name`, `start_date`, `end_date`, `is_active`) VALUES
+('Second Semester 2024', '2024-06-01', '2024-10-31', 0),
+('First Semester 2025', '2025-01-05', '2025-05-30', 1);
+
+-- Insert Master Book Records (Removed available_copies)
+INSERT INTO `Books` (`book_id`, `isbn`, `title`, `author`, `publisher`, `publication_year`, `cover_image_url`, `total_copies`) VALUES
+(1, '9780321765723', 'The Catcher in the Rye', 'J.D. Salinger', 'Little, Brown and Company', 1951, NULL, 5),
+(2, '9781491910290', 'Eloquent JavaScript', 'Marijn Haverbeke', 'No Starch Press', 2014, NULL, 3);
+
+-- Insert specific physical copies into the new BookCopies table
+INSERT INTO `BookCopies` (`book_id`, `call_number`, `barcode`, `status`) VALUES
+(1, 'FIC SAL C1-01', 'BARC000001', 'available'),
+(1, 'FIC SAL C1-02', 'BARC000002', 'available'),
+(1, 'FIC SAL C1-03', 'BARC000003', 'available'),
+(1, 'FIC SAL C1-04', 'BARC000004', 'available'),
+(1, 'FIC SAL C1-05', 'BARC000005', 'available'),
+(2, 'CS HLV E1-01', 'BARC000006', 'available'),
+(2, 'CS HLV E1-02', 'BARC000007', 'available'),
+(2, 'CS HLV E1-03', 'BARC000008', 'available');
