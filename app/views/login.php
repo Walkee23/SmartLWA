@@ -1,9 +1,5 @@
 <?php
 session_start();
-if (isset($_SESSION['error'])) {
-    echo "<p style='color:red; text-align: center; font-weight: bold;'>" . $_SESSION['error'] . "</p>";
-    unset($_SESSION['error']);
-}
 ?>
 
 <!DOCTYPE html>
@@ -13,108 +9,82 @@ if (isset($_SESSION['error'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - SmartLWA</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        /* General Styles */
+        /* Custom Styles to match the dark card and central layout */
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            /* Light gray background for the overall page */
             background-color: #f0f2f5;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
         }
 
-        /* Login Container */
-        .login-container {
-            background-color: #ffffff;
-            padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 360px;
-        }
-
-        .login-container h1 {
-            text-align: center;
-            color: #333333;
-            font-size: 1.8rem;
-            margin-bottom: 1.5rem;
-        }
-
-        /* Form Labels */
-        .login-container label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: #555555;
-            font-weight: 600;
-            font-size: 0.9rem;
-        }
-
-        /* Input Fields */
-        .login-container input {
-            width: 100%;
-            padding: 0.8rem;
-            margin-bottom: 1rem;
-            border: 1px solid #cccccc;
-            border-radius: 6px;
-            font-size: 1rem;
-            transition: border-color 0.3s ease;
-        }
-
-        .login-container input:focus {
-            border-color: #007bff;
-            outline: none;
-        }
-
-        /* Button */
-        .login-container button {
-            width: 100%;
-            padding: 0.8rem;
-            background-color: #007bff;
+        .login-card {
+            /* Dark blue/black background for the card as per the design */
+            background-color: #1a233b;
+            /* A deep, dark blue-gray */
             color: #ffffff;
-            border: none;
-            border-radius: 6px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.3s ease, transform 0.2s ease;
+            /* White text for contrast */
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            /* Stronger shadow for depth */
         }
 
-        .login-container button:hover {
-            background-color: #0056b3;
-            transform: translateY(-2px);
+        .form-label {
+            /* Labels on the dark background */
+            color: #ccc;
         }
 
-        /* Error Message */
-        .error-message {
-            color: #d9534f;
-            text-align: center;
-            font-weight: bold;
-            margin-bottom: 1rem;
+        .form-control {
+            /* Input fields should contrast with the dark card */
+            background-color: #313a52;
+            /* Slightly lighter than the card background */
+            border: 1px solid #495470;
+            color: #ffffff;
+        }
+
+        .form-control:focus {
+            /* Highlight on focus */
+            background-color: #313a52;
+            border-color: #007bff;
+            /* Use primary color for focus highlight */
+            box-shadow: 0 0 0 0.25rem rgba(0, 123, 255, 0.25);
+            color: #ffffff;
         }
     </style>
 </head>
 
-<body>
-    <div class="login-container">
-        <h1>Login</h1>
-        <?php
-        if (isset($_SESSION['error'])) {
-            echo "<p class='error-message'>" . $_SESSION['error'] . "</p>";
-            unset($_SESSION['error']);
-        }
-        ?>
-        <form method="POST" action="/SmartLWA/app/controllers/AuthController.php">
-            <label for="email">Email:</label>
-            <input type="email" id="email" name="email" required>
+<body class="d-flex justify-content-center align-items-center vh-100 p-3">
+    <div class="card login-card w-100" style="max-width: 380px;">
+        <div class="card-body p-5">
+            <h4 class="card-title text-center mb-4">Smart Library Login</h4>
 
-            <label for="password">Password:</label>
-            <input type="password" id="password" name="password" required>
+            <?php
+            // Display error message if set
+            if (isset($_SESSION['error'])) {
+                echo '<div class="alert alert-danger text-center" role="alert">';
+                echo htmlspecialchars($_SESSION['error']);
+                echo '</div>';
+                unset($_SESSION['error']);
+            }
+            ?>
 
-            <button type="submit">Login</button>
-        </form>
+            <form method="POST" action="/SmartLWA/app/controllers/AuthController.php">
+                <div class="mb-3">
+                    <label for="email" class="form-label">Email</label>
+                    <input type="email" class="form-control" id="email" name="email"
+                        required>
+                </div>
+
+                <div class="mb-4">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" class="form-control" id="password" name="password"
+                        required>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">Login</button>
+            </form>
+        </div>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>
