@@ -11,8 +11,9 @@ if (!isset($_SESSION['user_id'])) {
 require_once __DIR__ . '/../models/database.php';
 
 $user_id = $_SESSION['user_id'];
+$search_term = $_GET['search'] ?? '';
 
-// --- RECOMMENDED FEATURE: Pre-fetch current user's active reservations for validation ---
+// --- Pre-fetch current user's active reservations for validation ---
 $active_reservations = [];
 try {
     $stmt = $pdo->prepare("SELECT book_id FROM Reservations 
@@ -22,6 +23,33 @@ try {
 } catch (PDOException $e) {
     // Optionally log this error
 }
+// ---------------------------------------------------------------------------------------
+
+// Build the SQL Query
+$sql = "
+    SELECT
+        b.book_id,
+        b.title,
+        b.author,
+        b.publication_year,
+        b.cover_image_url,  -- Fetch the cover image URL
+        (SELECT COUNT(*) FROM BookCopies WHERE book_id = b.book_id AND status = 'available') AS available_copies
+    FROM Books b
+    WHERE b.archived = FALSE
+";
+
+$params = [];
+
+// Add search condition if a search term is present
+if (!empty($search_term)) {
+    // Search by Title OR Author
+    $sql .= " AND (b.title LIKE ? OR b.author LIKE ?)";
+    $like_term = '%' . $search_term . '%';
+    $params[] = $like_term;
+    $params[] = $like_term;
+}
+
+$sql .= " ORDER BY b.title ASC";
 // ---------------------------------------------------------------------------------------
 ?>
 <!DOCTYPE html>
@@ -33,7 +61,7 @@ try {
     <title>Available Books - SmartLWA</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        /* Sidebar Styling (Copied for consistency) */
+        /* Sidebar Styling (Consistent) */
         .sidebar {
             height: 100vh;
             width: 250px;
@@ -83,8 +111,20 @@ try {
             }
         }
         
-        .books-card {
-            min-height: 80vh;
+        /* Custom styles for the new card layout */
+        .book-cover {
+            height: 200px; /* Fixed height for image area */
+            object-fit: contain; /* Ensures the image fits without cropping */
+            width: 100%;
+            padding: 10px;
+        }
+        .book-card {
+            height: 100%; /* Ensures all cards in a row are the same height */
+            transition: transform 0.2s;
+        }
+        .book-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2) !important;
         }
     </style>
 </head>
@@ -94,9 +134,8 @@ try {
         <h3 class="text-center mb-4 text-white">Smart Library</h3>
         <a href="/SmartLWA/app/views/student_dashboard.php">Dashboard</a>
         <a href="/SmartLWA/app/views/my_reservations.php">Reservations</a>
-        <a href="/SmartLWA/app/views/my_borrowed_books.php">Borrowing</a>
+        <a href="/SmartLWA/app/views/my_borrowed_books.php">Borrowed Books</a>
         <a href="/SmartLWA/app/views/available_books.php" class="active">Available Books</a>
-        <a href="#">Penalties</a>
         <a href="/SmartLWA/app/controllers/AuthController.php?logout=true">Logout</a>
     </div>
 
@@ -115,75 +154,79 @@ try {
             </div>
         <?php endif; ?>
 
-        <div class="card shadow books-card">
-            <div class="card-body p-4">
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover align-middle">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Book ID</th>
-                                <th>Title</th>
-                                <th>Author</th>
-                                <th>Availability</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php
-                            // Query to select all non-archived books and count available copies
-                            $stmt = $pdo->prepare("
-                                SELECT
-                                    b.book_id,
-                                    b.title,
-                                    b.author,
-                                    (SELECT COUNT(*) FROM BookCopies WHERE book_id = b.book_id AND status = 'available') AS available_copies
-                                FROM Books b
-                                WHERE b.archived = FALSE
-                                ORDER BY b.title ASC
-                            ");
-                            $stmt->execute();
-
-                            if ($stmt->rowCount() > 0) {
-                                while ($book = $stmt->fetch()) {
-                                    $book_id = $book['book_id'];
-                                    $is_available = $book['available_copies'] > 0;
-                                    $has_active_reservation = in_array($book_id, $active_reservations);
-                                    
-                                    // Determine button state and text
-                                    $button_disabled = $has_active_reservation ? 'disabled' : '';
-                                    $button_text = $has_active_reservation ? 'Reserved' : 'Reserve';
-                                    $button_tooltip = $has_active_reservation ? 'You already have an active reservation for this book.' : '';
-                                    
-                                    // Determine availability badge
-                                    $badge_class = $is_available ? 'success' : 'warning';
-                                    $availability_text = $is_available ? "{$book['available_copies']} available" : 'No copies available';
-
-                                    echo "<tr>";
-                                    echo "<td>" . htmlspecialchars($book_id) . "</td>";
-                                    echo "<td>" . htmlspecialchars($book['title']) . "</td>";
-                                    echo "<td>" . htmlspecialchars($book['author']) . "</td>";
-                                    echo '<td><span class="badge bg-' . $badge_class . '">' . $availability_text . '</span></td>';
-                                    echo '<td>';
-                                    
-                                    // Action Button linking to the ReservationController
-                                    echo '<a href="/SmartLWA/app/controllers/ReservationController.php?action=reserve&book_id=' . $book_id . '" 
-                                            class="btn btn-sm btn-primary" ' . $button_disabled . '
-                                            title="' . $button_tooltip . '" data-bs-toggle="tooltip">';
-                                    echo $button_text;
-                                    echo '</a>';
-                                    
-                                    echo '</td>';
-                                    echo "</tr>";
-                                }
-                            } else {
-                                echo '<tr><td colspan="5" class="text-center">No books found in the catalog.</td></tr>';
-                            }
-                            ?>
-                        </tbody>
-                    </table>
-                </div>
+        <div class="row mb-4">
+            <div class="col-lg-6 col-md-8">
+                <form method="GET" action="/SmartLWA/app/views/available_books.php" class="d-flex">
+                    <input class="form-control me-2" type="search" placeholder="Search by title or author" 
+                           aria-label="Search" name="search" value="<?php echo htmlspecialchars($search_term); ?>">
+                    <button class="btn btn-outline-primary" type="submit">Search</button>
+                    <?php if (!empty($search_term)): ?>
+                        <a href="/SmartLWA/app/views/available_books.php" class="btn btn-outline-secondary ms-2">Clear</a>
+                    <?php endif; ?>
+                </form>
             </div>
         </div>
+
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
+            <?php
+            try {
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
+
+                if ($stmt->rowCount() > 0) {
+                    while ($book = $stmt->fetch()) {
+                        $book_id = $book['book_id'];
+                        $is_available = $book['available_copies'] > 0;
+                        $has_active_reservation = in_array($book_id, $active_reservations);
+                        
+                        // Image source: Use the stored URL or a placeholder if missing
+                        $image_src = !empty($book['cover_image_url']) 
+                                    ? htmlspecialchars($book['cover_image_url']) 
+                                    : 'https://via.placeholder.com/150x200?text=No+Cover'; 
+                        
+                        // Button logic
+                        $button_disabled = $has_active_reservation ? 'disabled' : '';
+                        $button_text = $has_active_reservation ? 'Reserved' : 'Reserve';
+                        $button_tooltip = $has_active_reservation ? 'You already have an active reservation for this book.' : 'Reserve this book title.';
+
+                        $availability_text = $is_available ? "{$book['available_copies']} available" : 'Unavailable';
+                        $availability_class = $is_available ? 'text-success' : 'text-danger';
+                        ?>
+                        
+                        <div class="col d-flex align-items-stretch">
+                            <div class="card shadow book-card w-100">
+                                <img src="<?php echo $image_src; ?>" class="card-img-top book-cover" 
+                                     alt="Cover of <?php echo htmlspecialchars($book['title']); ?>">
+                                <div class="card-body d-flex flex-column">
+                                    <h5 class="card-title mb-1 text-primary"><?php echo htmlspecialchars($book['title']); ?></h5>
+                                    <p class="card-text text-muted mb-2">by <?php echo htmlspecialchars($book['author']); ?></p>
+                                    
+                                    <div class="mt-auto pt-2">
+                                        <p class="mb-1 fw-bold <?php echo $availability_class; ?>">
+                                            <?php echo $availability_text; ?>
+                                        </p>
+                                        <a href="/SmartLWA/app/controllers/ReservationController.php?action=reserve&book_id=<?php echo $book_id; ?>" 
+                                            class="btn btn-sm btn-primary w-100 mt-2" 
+                                            <?php echo $button_disabled; ?>
+                                            title="<?php echo $button_tooltip; ?>" data-bs-toggle="tooltip">
+                                            <?php echo $button_text; ?>
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <?php
+                    }
+                } else {
+                    echo '<div class="col-12"><div class="alert alert-warning text-center">No books found matching your criteria.</div></div>';
+                }
+            } catch (PDOException $e) {
+                echo '<div class="col-12"><div class="alert alert-danger text-center">Error retrieving books: ' . htmlspecialchars($e->getMessage()) . '</div></div>';
+            }
+            ?>
+        </div>
+        
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

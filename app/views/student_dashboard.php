@@ -94,10 +94,10 @@ $user_id = $_SESSION['user_id'];
     <div class="sidebar">
         <h3 class="text-center mb-4 text-white">Smart Library</h3>
         <a href="/SmartLWA/app/views/student_dashboard.php" class="active">Dashboard</a>
-        <a href="/SmartLWA/app/views/available_books.php">Available Books</a>
-        <a href="/SmartLWA/app/views/my_borrowed_books.php">Borrowed Books</a>
         <a href="/SmartLWA/app/views/my_reservations.php">Reservations</a>
-        <a href="#">Penalties</a> <a href="/SmartLWA/app/controllers/AuthController.php?logout=true">Logout</a>
+        <a href="/SmartLWA/app/views/my_borrowed_books.php">Borrowed Books</a>
+        <a href="/SmartLWA/app/views/available_books.php">Available Books</a>
+        <a href="/SmartLWA/app/controllers/AuthController.php?logout=true">Logout</a>
     </div>
 
     <div class="main-content">
