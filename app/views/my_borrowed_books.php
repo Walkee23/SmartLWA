@@ -1,8 +1,8 @@
 <?php
 session_start();
 
-// Protect access: Only students/teachers should see this view
-if (!isset($_SESSION['user_id']) || ($_SESSION['role'] !== 'student' && $_SESSION['role'] !== 'teacher')) {
+// Protect access
+if (!isset($_SESSION['user_id'])) {
     header("Location: /SmartLWA/views/login.php");
     exit();
 }
@@ -11,6 +11,22 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] !== 'student' && $_SESSIO
 require_once __DIR__ . '/../models/database.php';
 
 $user_id = $_SESSION['user_id'];
+$user_role = $_SESSION['role'];
+
+// --- DYNAMIC CONTENT BASED ON ROLE ---
+// Determine Dashboard Link based on role
+$dashboard_link = ($user_role === 'teacher') 
+    ? '/SmartLWA/app/views/teacher_dashboard.php' 
+    : '/SmartLWA/app/views/student_dashboard.php';
+
+$header_text = ($user_role === 'teacher') 
+    ? 'My Borrowed Books' 
+    : 'My Borrowed Books';
+
+$lead_text = ($user_role === 'teacher') 
+    ? 'A list of all books currently checked out to your account. All books are due at the end of the current academic semester for clearance.' 
+    : 'A list of all books currently checked out to your account. Remember to return them by the due date to avoid penalties.';
+// ------------------------------------
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -18,8 +34,10 @@ $user_id = $_SESSION['user_id'];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Borrowed Books - SmartLWA</title>
+    <title><?php echo $header_text; ?> - SmartLWA</title>
+    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS for Sidebar Layout -->
     <style>
         .sidebar {
             height: 100vh;
@@ -77,19 +95,22 @@ $user_id = $_SESSION['user_id'];
 </head>
 
 <body>
+    <!-- 1. Sidebar Navigation (Uses dynamic links) -->
     <div class="sidebar">
         <h3 class="text-center mb-4 text-white">Smart Library</h3>
-        <a href="/SmartLWA/app/views/student_dashboard.php">Dashboard</a>
+        <a href="<?php echo $dashboard_link; ?>">Dashboard</a>
         <a href="/SmartLWA/app/views/my_reservations.php">Reservations</a>
         <a href="/SmartLWA/app/views/my_borrowed_books.php" class="active">Borrowed Books</a>
         <a href="/SmartLWA/app/views/available_books.php">Available Books</a>
         <a href="/SmartLWA/app/controllers/AuthController.php?logout=true">Logout</a>
     </div>
 
+    <!-- 2. Main Content Area -->
     <div class="main-content">
-        <h1 class="mb-4">My Borrowed Books</h1>
-        <p class="lead text-muted">A list of all books currently checked out to your account. Remember to return them by the due date to avoid penalties.</p>
+        <h1 class="mb-4"><?php echo $header_text; ?></h1>
+        <p class="lead text-muted"><?php echo $lead_text; ?></p>
 
+        <!-- Card to contain the table -->
         <div class="card shadow borrowing-card">
             <div class="card-body p-4">
                 <div class="table-responsive">
@@ -152,6 +173,7 @@ $user_id = $_SESSION['user_id'];
         </div>
     </div>
 
+    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 

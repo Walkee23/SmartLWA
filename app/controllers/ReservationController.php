@@ -52,14 +52,22 @@ class ReservationController
                 $this->redirectBack();
             }
 
-            // Check if the user already has an active or ready_for_pickup reservation for this book
+            // CHECK 1: Check if the user already has an active or ready_for_pickup reservation for this book
             $stmt = $this->db->prepare("SELECT reservation_id FROM Reservations 
                                       WHERE user_id = ? AND book_id = ? AND status IN ('active', 'ready_for_pickup')");
             $stmt->execute([$this->userId, $bookId]);
+            
+            // FIX: If a row is found, redirect immediately with an error message.
             if ($stmt->rowCount() > 0) {
-                $_SESSION['error'] = "You already have an active reservation for this book.";
+                $_SESSION['error'] = "You already have an active reservation for this book (Book ID: {$bookId}).";
                 $this->redirectBack();
+                return; // Ensure the script stops here
             }
+            
+            // CHECK 2 (OPTIONAL but good practice for students): Check if the student has reached their 3-book limit
+            // Since this is just a reservation, limits usually apply to *borrowing*, but a hard cap on reservations might be policy.
+            // Based on your database schema (unique key constraint being the issue), the above check is the primary fix.
+
 
             // Determine the reservation expiry date (e.g., 7 days from now)
             $expiryDate = date('Y-m-d H:i:s', strtotime('+7 days'));
@@ -75,7 +83,8 @@ class ReservationController
             header("Location: /SmartLWA/app/views/my_reservations.php");
             exit();
         } catch (PDOException $e) {
-            $_SESSION['error'] = "Database error: Could not place reservation. " . $e->getMessage();
+            // Catching the integrity violation is now redundant, but kept as a safeguard.
+            $_SESSION['error'] = "Database error: Could not place reservation. " . htmlspecialchars($e->getMessage());
             $this->redirectBack();
         }
     }

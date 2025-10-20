@@ -11,11 +11,19 @@ if (!isset($_SESSION['user_id'])) {
 require_once __DIR__ . '/../models/database.php';
 
 $user_id = $_SESSION['user_id'];
+$user_role = $_SESSION['role']; // Get role for dynamic links
 $search_term = $_GET['search'] ?? '';
+
+// --- DYNAMIC CONTENT SETUP ---
+// Determine Dashboard Link based on role
+$dashboard_link = ($user_role === 'teacher') 
+    ? '/SmartLWA/app/views/teacher_dashboard.php' 
+    : '/SmartLWA/app/views/student_dashboard.php';
 
 // --- Pre-fetch current user's active reservations for validation ---
 $active_reservations = [];
 try {
+    // This logic prevents a user (student OR teacher) from reserving the same book twice
     $stmt = $pdo->prepare("SELECT book_id FROM Reservations 
                            WHERE user_id = ? AND status IN ('active', 'ready_for_pickup')");
     $stmt->execute([$user_id]);
@@ -25,14 +33,14 @@ try {
 }
 // ---------------------------------------------------------------------------------------
 
-// Build the SQL Query
+// Build the SQL Query for book catalog display
 $sql = "
     SELECT
         b.book_id,
         b.title,
         b.author,
         b.publication_year,
-        b.cover_image_url,  -- Fetch the cover image URL
+        b.cover_image_url,  
         (SELECT COUNT(*) FROM BookCopies WHERE book_id = b.book_id AND status = 'available') AS available_copies
     FROM Books b
     WHERE b.archived = FALSE
@@ -130,9 +138,11 @@ $sql .= " ORDER BY b.title ASC";
 </head>
 
 <body>
+    <!-- 1. Sidebar Navigation (Role-Aware) -->
     <div class="sidebar">
         <h3 class="text-center mb-4 text-white">Smart Library</h3>
-        <a href="/SmartLWA/app/views/student_dashboard.php">Dashboard</a>
+        <!-- Dynamic Dashboard link -->
+        <a href="<?php echo $dashboard_link; ?>">Dashboard</a>
         <a href="/SmartLWA/app/views/my_reservations.php">Reservations</a>
         <a href="/SmartLWA/app/views/my_borrowed_books.php">Borrowed Books</a>
         <a href="/SmartLWA/app/views/available_books.php" class="active">Available Books</a>
@@ -154,6 +164,7 @@ $sql .= " ORDER BY b.title ASC";
             </div>
         <?php endif; ?>
 
+        <!-- Search Bar Form -->
         <div class="row mb-4">
             <div class="col-lg-6 col-md-8">
                 <form method="GET" action="/SmartLWA/app/views/available_books.php" class="d-flex">
@@ -167,6 +178,7 @@ $sql .= " ORDER BY b.title ASC";
             </div>
         </div>
 
+        <!-- Book Cards Grid -->
         <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-4">
             <?php
             try {

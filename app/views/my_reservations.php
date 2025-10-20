@@ -11,6 +11,14 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] !== 'student' && $_SESSIO
 require_once __DIR__ . '/../models/database.php';
 
 $user_id = $_SESSION['user_id'];
+$user_role = $_SESSION['role'];
+
+// --- DYNAMIC CONTENT SETUP ---
+// Determine Dashboard Link based on role
+$dashboard_link = ($user_role === 'teacher') 
+    ? '/SmartLWA/app/views/teacher_dashboard.php' 
+    : '/SmartLWA/app/views/student_dashboard.php';
+// -----------------------------
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -44,14 +52,14 @@ $user_id = $_SESSION['user_id'];
             color: #fff;
             background-color: #0056b3;
         }
-
+        
         /* Active link style for Reservations */
         .sidebar a.active {
             color: #fff;
             background-color: #007bff;
             font-weight: bold;
         }
-
+        
         /* Content area adjustment */
         .main-content {
             margin-left: 250px;
@@ -65,13 +73,11 @@ $user_id = $_SESSION['user_id'];
                 position: relative;
                 padding-top: 0;
             }
-
             .main-content {
                 margin-left: 0;
             }
         }
-
-        /* FIX: Ensure card is tall enough and use flex to push the footer */
+        /* FIX: Use min-height to ensure card is tall enough, and rely on flex to push the footer */
         .reservations-card {
             min-height: 85vh;
         }
@@ -79,20 +85,24 @@ $user_id = $_SESSION['user_id'];
 </head>
 
 <body>
+    <!-- 1. Sidebar Navigation (Uses dynamic dashboard link) -->
     <div class="sidebar">
         <h3 class="text-center mb-4 text-white">Smart Library</h3>
-        <a href="/SmartLWA/app/views/student_dashboard.php">Dashboard</a>
+        <!-- Dynamic Dashboard link -->
+        <a href="<?php echo $dashboard_link; ?>">Dashboard</a>
         <a href="/SmartLWA/app/views/my_reservations.php" class="active">Reservations</a>
-        <a href="/SmartLWA/app/views/my_borrowed_books.php">Borrowed Books</a>
+        <!-- Shared Borrowed Books link -->
+        <a href="/SmartLWA/app/views/my_borrowed_books.php">Borrowed Books</a> 
         <a href="/SmartLWA/app/views/available_books.php">Available Books</a>
         <a href="/SmartLWA/app/controllers/AuthController.php?logout=true">Logout</a>
     </div>
 
     <div class="main-content">
-        <h1 class="mb-4">Reservations</h1>
+        <h1 class="mb-4">My Reservations</h1>
+        <p class="lead text-muted">All active reservations for your account. You will receive a notification when a copy is ready for pickup.</p>
 
         <div class="card shadow reservations-card d-flex flex-column">
-
+            
             <div class="card-body p-4 flex-grow-1">
                 <div class="table-responsive">
                     <table class="table table-striped table-hover">
@@ -153,7 +163,7 @@ $user_id = $_SESSION['user_id'];
                     </table>
                 </div>
             </div>
-
+            
             <div class="card-footer bg-white text-end border-0 pt-0">
                 <a href="/SmartLWA/app/views/available_books.php" class="btn btn-primary px-4 py-2">Reserve Book</a>
             </div>

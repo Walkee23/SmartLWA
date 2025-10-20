@@ -164,7 +164,7 @@ $user_id = $_SESSION['user_id'];
 
         <div class="row">
             <div class="col-12">
-                <h3>My Current Loans</h3>
+                <h3>My Current Books Borrowed</h3>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
                         <thead class="table-light">
