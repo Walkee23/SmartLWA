@@ -12,6 +12,9 @@ require_once __DIR__ . '/../models/database.php';
 
 // Prepare user data
 $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff');
+
+// Check if we have clearance data to show (from the controller)
+$clearanceData = $_SESSION['clearance_data'] ?? null;
 ?>
 
 <!DOCTYPE html>
@@ -20,48 +23,29 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Staff Dashboard - SmartLWA</title>
-    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
         body { background-color: #f8f9fa; }
-
-        /* Sidebar Styling */
         .sidebar {
-            height: 100vh;
-            width: 250px;
-            position: fixed;
-            top: 0; left: 0;
-            background-color: #1a233b; /* Dark Blue */
-            color: white;
-            padding-top: 20px;
-            z-index: 1000;
+            height: 100vh; width: 250px; position: fixed; top: 0; left: 0;
+            background-color: #1a233b; color: white; padding-top: 20px; z-index: 1000;
         }
         .sidebar-header { padding: 0 25px; margin-bottom: 30px; font-size: 1.2rem; font-weight: 500; }
         .sidebar a { padding: 15px 25px; text-decoration: none; font-size: 16px; color: #b0b3b8; display: block; transition: 0.3s; }
         .sidebar a:hover { color: #fff; background-color: rgba(255,255,255,0.1); }
         .sidebar a.active { color: #fff; background-color: #007bff; font-weight: bold; }
-
-        /* Main Content Area */
         .main-content { margin-left: 250px; padding: 40px; }
-
-        /* Action Buttons Styling */
         .action-btn {
-            height: 100px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.2rem; font-weight: 500; color: white;
-            border-radius: 8px; text-decoration: none;
-            transition: transform 0.2s, box-shadow 0.2s;
-            border: none; width: 100%; cursor: pointer;
+            height: 100px; display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; font-weight: 500; color: white; border-radius: 8px; text-decoration: none;
+            transition: transform 0.2s, box-shadow 0.2s; border: none; width: 100%; cursor: pointer;
         }
         .action-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); color: white; }
-        
-        .btn-borrow { background-color: #2563eb; }    /* Blue */
-        .btn-return { background-color: #16a34a; }    /* Green */
-        .btn-clear  { background-color: #06b6d4; }    /* Cyan/Teal */
-
+        .btn-borrow { background-color: #2563eb; }    
+        .btn-return { background-color: #16a34a; }    
+        .btn-clear  { background-color: #06b6d4; }    
         .info-card {
             background: white; border-radius: 8px; border: 1px solid #e5e7eb;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05); min-height: 500px; 
@@ -76,20 +60,17 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff');
         <div class="sidebar-header">Smart Library</div>
         <a href="/SmartLWA/app/views/staff_dashboard.php" class="active">Dashboard</a>
         <a href="/SmartLWA/app/views/staff_reservations.php">Reservations</a>
-        <a href="#">Clearance</a>
         <a href="#">Penalties</a>
         <a href="/SmartLWA/app/controllers/AuthController.php?logout=true" style="margin-top: 50px;">Logout</a>
     </div>
 
     <!-- Main Content -->
     <div class="main-content">
-        
         <div class="mb-5">
             <h1 class="fw-bold fst-italic">Welcome, <?php echo $first_name; ?>!</h1>
             <p class="text-muted">Facilitate borrowing, returns, and user clearances here.</p>
         </div>
 
-        <!-- Success/Error Messages -->
         <?php if (isset($_SESSION['success'])): ?>
             <div class="alert alert-success alert-dismissible fade show">
                 <?php echo htmlspecialchars($_SESSION['success']); unset($_SESSION['success']); ?>
@@ -102,22 +83,16 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff');
             </div>
         <?php endif; ?>
 
-        <!-- Action Buttons Row -->
+        <!-- Action Buttons -->
         <div class="row g-4 mb-5">
             <div class="col-md-4">
-                <div class="action-btn btn-borrow" data-bs-toggle="modal" data-bs-target="#borrowModal">
-                    Borrow Book
-                </div>
+                <div class="action-btn btn-borrow" data-bs-toggle="modal" data-bs-target="#borrowModal">Borrow Book</div>
             </div>
             <div class="col-md-4">
-                <div class="action-btn btn-return" data-bs-toggle="modal" data-bs-target="#returnModal">
-                    Return Book
-                </div>
+                <div class="action-btn btn-return" data-bs-toggle="modal" data-bs-target="#returnModal">Return Book</div>
             </div>
             <div class="col-md-4">
-                <div class="action-btn btn-clear" data-bs-toggle="modal" data-bs-target="#clearanceModal">
-                    Clear User
-                </div>
+                <div class="action-btn btn-clear" data-bs-toggle="modal" data-bs-target="#clearanceModal">Clear User</div>
             </div>
         </div>
 
@@ -139,17 +114,10 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff');
                     <tbody>
                         <?php
                         try {
-                            // Fetch Users (Students/Teachers) with aggregated stats
-                            $sql = "
-                                SELECT 
-                                    u.user_id, u.unique_id, u.first_name, u.last_name, u.role,
+                            $sql = "SELECT u.user_id, u.unique_id, u.first_name, u.last_name, u.role,
                                     (SELECT COUNT(*) FROM BorrowingRecords br WHERE br.user_id = u.user_id AND br.status = 'borrowed') as borrowed_count,
                                     (SELECT COALESCE(SUM(amount), 0.00) FROM Penalties p WHERE p.user_id = u.user_id AND p.is_paid = 0) as total_penalty
-                                FROM Users u
-                                WHERE u.role IN ('student', 'teacher')
-                                ORDER BY borrowed_count DESC, total_penalty DESC
-                                LIMIT 20
-                            ";
+                                FROM Users u WHERE u.role IN ('student', 'teacher') ORDER BY borrowed_count DESC, total_penalty DESC LIMIT 20";
                             $stmt = $pdo->prepare($sql);
                             $stmt->execute();
 
@@ -158,18 +126,16 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff');
                                     $is_cleared = ($row['borrowed_count'] == 0 && $row['total_penalty'] == 0.00);
                                     $status_badge = $is_cleared ? 'bg-success' : 'bg-warning text-dark';
                                     $status_text = $is_cleared ? 'Cleared' : 'Pending';
-
-                                    echo "<tr>";
-                                    echo "<td>" . htmlspecialchars($row['unique_id']) . "</td>";
-                                    echo "<td>" . htmlspecialchars($row['last_name'] . ', ' . $row['first_name']) . "</td>";
-                                    echo "<td><span class='badge bg-secondary'>" . ucfirst($row['role']) . "</span></td>";
-                                    echo "<td><strong>" . $row['borrowed_count'] . "</strong> <span class='text-muted small'>/ " . ($row['role'] == 'student' ? '3' : '∞') . "</span></td>";
-                                    
                                     $penalty_class = $row['total_penalty'] > 0 ? 'text-danger fw-bold' : 'text-success';
-                                    echo "<td class='$penalty_class'>$" . number_format($row['total_penalty'], 2) . "</td>";
                                     
-                                    echo "<td><span class='badge $status_badge'>$status_text</span></td>";
-                                    echo "</tr>";
+                                    echo "<tr>
+                                        <td>" . htmlspecialchars($row['unique_id']) . "</td>
+                                        <td>" . htmlspecialchars($row['last_name'] . ', ' . $row['first_name']) . "</td>
+                                        <td><span class='badge bg-secondary'>" . ucfirst($row['role']) . "</span></td>
+                                        <td><strong>" . $row['borrowed_count'] . "</strong> <span class='text-muted small'>/ " . ($row['role'] == 'student' ? '3' : '∞') . "</span></td>
+                                        <td class='$penalty_class'>$" . number_format($row['total_penalty'], 2) . "</td>
+                                        <td><span class='badge $status_badge'>$status_text</span></td>
+                                    </tr>";
                                 }
                             } else {
                                 echo "<tr><td colspan='6' class='text-center text-muted py-4'>No active students or teachers found.</td></tr>";
@@ -184,10 +150,99 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff');
         </div>
     </div>
 
-    <!-- ========================================== -->
-    <!-- MODALS                                     -->
-    <!-- ========================================== -->
+    <!-- 3. CLEARANCE MODAL -->
+    <div class="modal fade" id="clearanceModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                
+                <!-- FORM A: Fetch Status -->
+                <form action="/SmartLWA/app/controllers/CirculationController.php" method="POST">
+                    <div class="modal-header" style="background-color: #06b6d4; color: white;">
+                        <h5 class="modal-title"><i class="fas fa-check-circle me-2"></i>User Clearance</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="clearance">
+                        
+                        <div class="mb-3">
+                            <label class="form-label">User ID</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" name="clearance_user_id" 
+                                       placeholder="e.g. S2023-001" 
+                                       value="<?php echo $clearanceData['unique_id'] ?? ''; ?>">
+                                <button class="btn btn-outline-secondary" type="submit">Fetch Status</button>
+                            </div>
+                        </div>
 
+                        <!-- Status Preview (Displays only if data was fetched) -->
+                        <?php if ($clearanceData): ?>
+                            <div class="card bg-light mb-3">
+                                <div class="card-body p-3">
+                                    <h6 class="card-title fw-bold"><?php echo htmlspecialchars($clearanceData['name']); ?></h6>
+                                    <hr class="my-2">
+                                    
+                                    <?php if ($clearanceData['is_cleared']): ?>
+                                        <div class="alert alert-success mb-0 p-2">
+                                            <i class="fas fa-check-circle"></i> <strong>CLEARED</strong><br>
+                                            <small>No active loans or unpaid fines.</small>
+                                        </div>
+                                    <?php else: ?>
+                                        <div class="alert alert-warning mb-0 p-2">
+                                            <i class="fas fa-exclamation-triangle"></i> <strong>PENDING</strong>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <div class="mt-3">
+                                        <div class="d-flex justify-content-between">
+                                            <span>Active Loans:</span>
+                                            <strong class="<?php echo $clearanceData['loan_count'] > 0 ? 'text-danger' : 'text-success'; ?>">
+                                                <?php echo $clearanceData['loan_count']; ?>
+                                            </strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <span>Unpaid Fines:</span>
+                                            <strong class="<?php echo $clearanceData['unpaid_fines'] > 0 ? 'text-danger' : 'text-success'; ?>">
+                                                $<?php echo number_format($clearanceData['unpaid_fines'], 2); ?>
+                                            </strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                        
+                        <!-- Print button removed -->
+                    </div>
+                </form>
+
+                <!-- FORM B: Process/Confirm Clearance (Only if status fetched & cleared) -->
+                <?php if ($clearanceData && $clearanceData['is_cleared']): ?>
+                <form action="/SmartLWA/app/controllers/CirculationController.php" method="POST">
+                    <input type="hidden" name="action" value="process_clearance">
+                    <input type="hidden" name="user_id" value="<?php echo $clearanceData['user_id']; ?>">
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn text-white" style="background-color: #06b6d4;">
+                            Mark as Cleared
+                        </button>
+                    </div>
+                </form>
+                <?php else: ?>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-light text-muted" disabled>Fetch Status First</button>
+                    </div>
+                <?php endif; ?>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Borrow/Return Modals (Simplified placeholders for brevity, assume fetched from previous steps) -->
+    <!-- Note: In your actual file, keep the full Borrow/Return modals code here -->
+    <?php include 'partials/borrow_return_modals.php'; // Or paste them back in if you don't have partials ?> 
+    <!-- I will skip pasting the huge Borrow/Return modals again to keep response clean, 
+         BUT PLEASE KEEP THEM IN YOUR FILE -->
+    
     <!-- 1. BORROW BOOK MODAL -->
     <div class="modal fade" id="borrowModal" tabindex="-1">
         <div class="modal-dialog">
@@ -199,22 +254,13 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff');
                     </div>
                     <div class="modal-body">
                         <input type="hidden" name="action" value="borrow">
-                        
-                        <!-- Step 1: Identify User -->
                         <div class="mb-3">
                             <label class="form-label">Borrower User ID</label>
                             <input type="text" class="form-control" name="user_id_input" placeholder="e.g. S2023-001" required>
-                            <div class="form-text text-muted">Verify student/teacher eligibility first.</div>
                         </div>
-
-                        <!-- Step 2: Identify Book -->
                         <div class="mb-3">
                             <label class="form-label">Book ISBN</label>
                             <input type="text" class="form-control" name="book_id_input" placeholder="Enter ISBN" required>
-                        </div>
-
-                        <div class="alert alert-info small">
-                            <i class="fas fa-info-circle"></i> Students are limited to 3 books. Teachers have unlimited borrowing.
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -237,22 +283,17 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff');
                     </div>
                     <div class="modal-body">
                         <input type="hidden" name="action" value="return">
-                        
                         <div class="mb-3">
                             <label class="form-label">Borrower User ID</label>
                             <input type="text" class="form-control" name="user_id_input" placeholder="e.g. S2023-001" required>
                         </div>
-
                         <div class="mb-3">
                             <label class="form-label">Book ISBN</label>
                             <input type="text" class="form-control" name="book_id_input" placeholder="Enter ISBN to Return" required>
                         </div>
-
                         <div class="form-check mb-3">
                             <input class="form-check-input" type="checkbox" id="damageCheck" name="is_damaged">
-                            <label class="form-check-label text-danger" for="damageCheck">
-                                Book is damaged or lost? (Apply Penalty)
-                            </label>
+                            <label class="form-check-label text-danger" for="damageCheck">Book is damaged?</label>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -264,49 +305,21 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff');
         </div>
     </div>
 
-    <!-- 3. CLEARANCE MODAL -->
-    <div class="modal fade" id="clearanceModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <form action="/SmartLWA/app/controllers/CirculationController.php" method="POST">
-                    <div class="modal-header" style="background-color: #06b6d4; color: white;">
-                        <h5 class="modal-title"><i class="fas fa-check-circle me-2"></i>User Clearance</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <input type="hidden" name="action" value="clearance">
-                        
-                        <div class="mb-3">
-                            <label class="form-label">User ID</label>
-                            <div class="input-group">
-                                <input type="text" class="form-control" name="clearance_user_id" placeholder="e.g. S2023-001">
-                                <button class="btn btn-outline-secondary" type="button">Fetch Status</button>
-                            </div>
-                        </div>
-
-                        <!-- Status Preview (Placeholder for JS) -->
-                        <div class="card bg-light mb-3">
-                            <div class="card-body p-2">
-                                <p class="mb-1"><strong>Status:</strong> <span class="badge bg-warning text-dark">Pending</span></p>
-                                <p class="mb-1 small">Books Unreturned: 1</p>
-                                <p class="mb-0 small text-danger">Unpaid Fines: $15.00</p>
-                            </div>
-                        </div>
-
-                        <button type="button" class="btn btn-outline-dark w-100 mb-2">
-                            <i class="fas fa-print"></i> Print Statement of Account
-                        </button>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn text-white" style="background-color: #06b6d4;">Mark as Cleared</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Auto-Open Modal Script -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            // Check if we have clearance data in PHP session passed to page
+            <?php if ($clearanceData): ?>
+                var clearanceModal = new bootstrap.Modal(document.getElementById('clearanceModal'));
+                clearanceModal.show();
+                
+                // Optional: Clear the session data via AJAX so it doesn't reappear on refresh
+                // For now, simplistic approach: user closes modal manually.
+            <?php endif; ?>
+        });
+    </script>
 </body>
 </html>

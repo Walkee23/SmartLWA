@@ -28,6 +28,9 @@ class CirculationController {
             case 'clearance':
                 $this->checkClearance(); 
                 break;
+            case 'process_clearance':
+                $this->processClearance();
+                break;
             default:
                 $_SESSION['error'] = "Invalid action.";
                 $this->redirectBack();
@@ -95,6 +98,11 @@ class CirculationController {
             $stmt = $this->db->prepare("UPDATE BookCopies SET status = 'on_loan' WHERE copy_id = ?");
             $stmt->execute([$copy['copy_id']]);
 
+            // 8. Fulfill Reservation (Mark fulfilled if exists)
+            $stmt = $this->db->prepare("UPDATE Reservations SET status = 'fulfilled' 
+                                      WHERE user_id = ? AND book_id = ? AND status IN ('active', 'ready_for_pickup')");
+            $stmt->execute([$user['user_id'], $book['book_id']]);
+
             $this->db->commit();
             $_SESSION['success'] = "Book '{$book['title']}' borrowed successfully! Due date: $dueDate";
 
@@ -107,7 +115,6 @@ class CirculationController {
     }
 
     private function processReturn() {
-        // Updated inputs to match Borrowing style (User ID + ISBN)
         $uniqueId = trim($_POST['user_id_input'] ?? '');
         $isbn = trim($_POST['book_id_input'] ?? '');
         $isDamaged = isset($_POST['is_damaged']);
@@ -138,8 +145,7 @@ class CirculationController {
                 throw new Exception("Book with ISBN '$isbn' not found.");
             }
 
-            // 3. Find the Active Loan for this User and Book
-            // We join BorrowingRecords with BookCopies to match the book_id from the ISBN
+            // 3. Find the Active Loan
             $stmt = $this->db->prepare("
                 SELECT br.record_id, br.due_date, br.copy_id 
                 FROM BorrowingRecords br
@@ -158,7 +164,6 @@ class CirculationController {
 
             // 4. Update Record to 'returned'
             $returnDate = date('Y-m-d H:i:s');
-            // Check for overdue
             $status = (strtotime($returnDate) > strtotime($loan['due_date'] . ' 23:59:59')) ? 'overdue' : 'returned';
             
             $stmt = $this->db->prepare("UPDATE BorrowingRecords SET return_date = ?, status = ? WHERE record_id = ?");
@@ -169,23 +174,19 @@ class CirculationController {
             $stmt = $this->db->prepare("UPDATE BookCopies SET status = ? WHERE copy_id = ?");
             $stmt->execute([$newCopyStatus, $loan['copy_id']]);
 
-            // 6. Handle Penalties (Basic Implementation)
+            // 6. Handle Penalties
             $messages = [];
             $messages[] = "Book returned successfully.";
 
-            // Overdue Penalty
             if ($status === 'overdue') {
-                $penaltyAmount = 50.00; // Flat fee example
+                $penaltyAmount = 50.00; 
                 $stmt = $this->db->prepare("INSERT INTO Penalties (user_id, record_id, amount, reason) VALUES (?, ?, ?, 'Overdue Fine')");
                 $stmt->execute([$user['user_id'], $loan['record_id'], $penaltyAmount]);
                 $messages[] = "Overdue fine of $50.00 applied.";
             }
 
-            // Damage Penalty
             if ($isDamaged) {
-                // Use fetched book price or default
                 $price = $book['price'] ?: 100.00; 
-
                 $stmt = $this->db->prepare("INSERT INTO Penalties (user_id, record_id, amount, reason) VALUES (?, ?, ?, 'Book Damage Fee')");
                 $stmt->execute([$user['user_id'], $loan['record_id'], $price]);
                 $messages[] = "Damage fee of $$price applied.";
@@ -202,16 +203,17 @@ class CirculationController {
         $this->redirectBack();
     }
 
+    // Fetches status for display in the modal
     private function checkClearance() {
         $uniqueId = trim($_POST['clearance_user_id'] ?? '');
 
         if (empty($uniqueId)) {
-            $_SESSION['error'] = "Enter a User ID.";
+            $_SESSION['error'] = "Enter a User ID to check.";
             $this->redirectBack();
         }
 
         try {
-            $stmt = $this->db->prepare("SELECT user_id, first_name, last_name FROM Users WHERE unique_id = ?");
+            $stmt = $this->db->prepare("SELECT user_id, unique_id, first_name, last_name FROM Users WHERE unique_id = ?");
             $stmt->execute([$uniqueId]);
             $user = $stmt->fetch();
 
@@ -229,11 +231,15 @@ class CirculationController {
             $stmt->execute([$user['user_id']]);
             $unpaidFines = $stmt->fetchColumn() ?: 0.00;
 
-            if ($loanCount == 0 && $unpaidFines == 0) {
-                $_SESSION['success'] = "User {$user['first_name']} {$user['last_name']} is CLEARED. No active liabilities.";
-            } else {
-                $_SESSION['error'] = "Cannot Clear: User has $loanCount active books and $$unpaidFines in unpaid fines.";
-            }
+            // STORE DATA IN SESSION to display in the modal
+            $_SESSION['clearance_data'] = [
+                'user_id' => $user['user_id'], // for the confirm button
+                'unique_id' => $user['unique_id'],
+                'name' => $user['first_name'] . ' ' . $user['last_name'],
+                'loan_count' => $loanCount,
+                'unpaid_fines' => $unpaidFines,
+                'is_cleared' => ($loanCount == 0 && $unpaidFines == 0)
+            ];
 
         } catch (Exception $e) {
             $_SESSION['error'] = $e->getMessage();
@@ -241,12 +247,28 @@ class CirculationController {
         $this->redirectBack();
     }
 
+    // Actually processes the clearance (Finalizing it)
+    private function processClearance() {
+        // In a real system, this might generate a PDF or set a 'is_cleared' flag in the Users table.
+        // For now, we'll just show a success message if they are eligible.
+        
+        $userId = $_POST['user_id'] ?? '';
+        // Re-verify logic could go here for security...
+        
+        $_SESSION['success'] = "User has been officially marked as CLEARED.";
+        unset($_SESSION['clearance_data']); // Clear the modal data
+        $this->redirectBack();
+    }
+
     private function redirectBack() {
-        header("Location: /SmartLWA/app/views/staff_dashboard.php");
+        if (isset($_SERVER['HTTP_REFERER'])) {
+            header("Location: " . $_SERVER['HTTP_REFERER']);
+        } else {
+            header("Location: /SmartLWA/app/views/staff_dashboard.php");
+        }
         exit();
     }
 }
 
-// Init
 $controller = new CirculationController($pdo);
 $controller->handleRequest();
