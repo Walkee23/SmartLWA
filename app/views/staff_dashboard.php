@@ -128,7 +128,7 @@ $clearanceData = $_SESSION['clearance_data'] ?? null;
         <a href="/SmartLWA/app/views/staff_dashboard.php" class="active">Dashboard</a>
         <a href="/SmartLWA/app/views/staff_reservations.php">Reservations</a>
         <a href="/SmartLWA/app/views/staff_penalties.php">Penalties</a> <!-- Link Updated -->
-        <a href="/SmartLWA/app/controllers/AuthController.php?logout=true" style="margin-top: 50px;">Logout</a>
+        <a href="/SmartLWA/app/controllers/AuthController.php?logout=true">Logout</a>
     </div>
 
     <!-- Main Content -->

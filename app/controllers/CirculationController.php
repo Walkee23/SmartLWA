@@ -71,7 +71,7 @@ class CirculationController {
                 throw new Exception("User ID '$uniqueId' not found.");
             }
 
-            // 2. Find Book by ISBN (Strictly ISBN only)
+            // 2. Find Book by ISBN
             $stmt = $this->db->prepare("SELECT book_id, title FROM Books WHERE isbn = ? LIMIT 1");
             $stmt->execute([$isbn]);
             $book = $stmt->fetch();
@@ -80,7 +80,7 @@ class CirculationController {
                 throw new Exception("Book with ISBN '$isbn' not found in database.");
             }
 
-            // 3. Find an AVAILABLE copy for this book
+            // 3. Find an AVAILABLE copy
             $stmt = $this->db->prepare("SELECT copy_id, barcode, status FROM BookCopies WHERE book_id = ? AND status = 'available' LIMIT 1");
             $stmt->execute([$book['book_id']]);
             $copy = $stmt->fetch();
@@ -89,7 +89,7 @@ class CirculationController {
                 throw new Exception("Book '{$book['title']}' found, but no physical copies are currently available.");
             }
 
-            // 4. Check Borrowing Limit (Students = 3 max)
+            // 4. Check Borrowing Limit
             if ($user['role'] === 'student') {
                 $stmt = $this->db->prepare("SELECT COUNT(*) FROM BorrowingRecords WHERE user_id = ? AND status = 'borrowed'");
                 $stmt->execute([$user['user_id']]);
@@ -100,18 +100,16 @@ class CirculationController {
                 }
             }
 
-            // 5. Calculate Due Date (e.g., 7 days from now)
+            // 5. Create Record
             $dueDate = date('Y-m-d', strtotime('+7 days'));
-
-            // 6. Create Record
             $stmt = $this->db->prepare("INSERT INTO BorrowingRecords (copy_id, user_id, due_date, status) VALUES (?, ?, ?, 'borrowed')");
             $stmt->execute([$copy['copy_id'], $user['user_id'], $dueDate]);
 
-            // 7. Update Copy Status
+            // 6. Update Copy Status
             $stmt = $this->db->prepare("UPDATE BookCopies SET status = 'on_loan' WHERE copy_id = ?");
             $stmt->execute([$copy['copy_id']]);
 
-            // 8. Fulfill Reservation (Mark fulfilled if exists)
+            // 7. Fulfill Reservation
             $stmt = $this->db->prepare("UPDATE Reservations SET status = 'fulfilled' 
                                       WHERE user_id = ? AND book_id = ? AND status IN ('active', 'ready_for_pickup')");
             $stmt->execute([$user['user_id'], $book['book_id']]);
@@ -130,7 +128,7 @@ class CirculationController {
     private function processReturn() {
         $uniqueId = trim($_POST['user_id_input'] ?? '');
         $isbn = trim($_POST['book_id_input'] ?? '');
-        $condition = $_POST['condition'] ?? 'good'; // 'good', 'damaged', 'lost'
+        $condition = $_POST['condition'] ?? 'good'; 
 
         if (empty($uniqueId) || empty($isbn)) {
             $_SESSION['error'] = "Please provide both User ID and Book ISBN to return.";
@@ -163,9 +161,7 @@ class CirculationController {
                 SELECT br.record_id, br.due_date, br.copy_id 
                 FROM BorrowingRecords br
                 JOIN BookCopies bc ON br.copy_id = bc.copy_id
-                WHERE br.user_id = ? 
-                  AND bc.book_id = ? 
-                  AND br.status = 'borrowed' 
+                WHERE br.user_id = ? AND bc.book_id = ? AND br.status = 'borrowed' 
                 LIMIT 1
             ");
             $stmt->execute([$user['user_id'], $book['book_id']]);
@@ -175,7 +171,7 @@ class CirculationController {
                 throw new Exception("No active loan found for this user and book.");
             }
 
-            // 4. Update Record to 'returned'
+            // 4. Update Record
             $returnDate = date('Y-m-d H:i:s');
             $status = (strtotime($returnDate) > strtotime($loan['due_date'] . ' 23:59:59')) ? 'overdue' : 'returned';
             
@@ -194,7 +190,6 @@ class CirculationController {
             $messages = [];
             $messages[] = "Book returned successfully.";
 
-            // Overdue Penalty
             if ($status === 'overdue') {
                 $penaltyAmount = 50.00; 
                 $stmt = $this->db->prepare("INSERT INTO Penalties (user_id, record_id, amount, reason) VALUES (?, ?, ?, 'Overdue Fine')");
@@ -202,8 +197,7 @@ class CirculationController {
                 $messages[] = "Overdue fine of $50.00 applied.";
             }
 
-            // Damage/Lost Penalty
-            $basePrice = $book['price'] ?: 100.00; // Default if null
+            $basePrice = $book['price'] ?: 100.00; // Default price
             
             if ($condition === 'damaged') {
                 $damageFee = $basePrice * 0.50; // 50% Fee
@@ -376,7 +370,7 @@ class CirculationController {
             $_SESSION['error'] = "Payment failed: " . $e->getMessage();
         }
 
-        // Redirect back to the penalties page
+        // Redirect specifically to penalties page
         header("Location: /SmartLWA/app/views/staff_penalties.php");
         exit();
     }
