@@ -4,6 +4,12 @@ require_once __DIR__ . '/../models/database.php';
 
 // Security: Only Staff or Librarians can access circulation
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['staff', 'librarian'])) {
+    // Allow AJAX calls to fail gracefully with JSON if not logged in
+    if(isset($_GET['action']) && strpos($_GET['action'], 'json') !== false) {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+        exit();
+    }
     header("Location: /SmartLWA/views/login.php");
     exit();
 }
@@ -16,7 +22,8 @@ class CirculationController {
     }
 
     public function handleRequest() {
-        $action = $_POST['action'] ?? '';
+        // Check both GET and POST for action
+        $action = $_REQUEST['action'] ?? '';
 
         switch ($action) {
             case 'borrow':
@@ -30,6 +37,12 @@ class CirculationController {
                 break;
             case 'process_clearance':
                 $this->processClearance();
+                break;
+            case 'pay_all_penalties': // NEW: Pay all for user
+                $this->processPayAll();
+                break;
+            case 'get_user_penalties_json': // NEW: API for Modal
+                $this->getUserPenaltiesJson();
                 break;
             default:
                 $_SESSION['error'] = "Invalid action.";
@@ -117,7 +130,7 @@ class CirculationController {
     private function processReturn() {
         $uniqueId = trim($_POST['user_id_input'] ?? '');
         $isbn = trim($_POST['book_id_input'] ?? '');
-        $isDamaged = isset($_POST['is_damaged']);
+        $condition = $_POST['condition'] ?? 'good'; // 'good', 'damaged', 'lost'
 
         if (empty($uniqueId) || empty($isbn)) {
             $_SESSION['error'] = "Please provide both User ID and Book ISBN to return.";
@@ -170,7 +183,10 @@ class CirculationController {
             $stmt->execute([$returnDate, $status, $loan['record_id']]);
 
             // 5. Update Copy Status
-            $newCopyStatus = $isDamaged ? 'in_repair' : 'available';
+            $newCopyStatus = 'available';
+            if ($condition === 'damaged') $newCopyStatus = 'in_repair';
+            if ($condition === 'lost') $newCopyStatus = 'lost';
+            
             $stmt = $this->db->prepare("UPDATE BookCopies SET status = ? WHERE copy_id = ?");
             $stmt->execute([$newCopyStatus, $loan['copy_id']]);
 
@@ -178,6 +194,7 @@ class CirculationController {
             $messages = [];
             $messages[] = "Book returned successfully.";
 
+            // Overdue Penalty
             if ($status === 'overdue') {
                 $penaltyAmount = 50.00; 
                 $stmt = $this->db->prepare("INSERT INTO Penalties (user_id, record_id, amount, reason) VALUES (?, ?, ?, 'Overdue Fine')");
@@ -185,11 +202,19 @@ class CirculationController {
                 $messages[] = "Overdue fine of $50.00 applied.";
             }
 
-            if ($isDamaged) {
-                $price = $book['price'] ?: 100.00; 
-                $stmt = $this->db->prepare("INSERT INTO Penalties (user_id, record_id, amount, reason) VALUES (?, ?, ?, 'Book Damage Fee')");
-                $stmt->execute([$user['user_id'], $loan['record_id'], $price]);
-                $messages[] = "Damage fee of $$price applied.";
+            // Damage/Lost Penalty
+            $basePrice = $book['price'] ?: 100.00; // Default if null
+            
+            if ($condition === 'damaged') {
+                $damageFee = $basePrice * 0.50; // 50% Fee
+                $stmt = $this->db->prepare("INSERT INTO Penalties (user_id, record_id, amount, reason) VALUES (?, ?, ?, 'Damaged Book Fee (50%)')");
+                $stmt->execute([$user['user_id'], $loan['record_id'], $damageFee]);
+                $messages[] = "Damage fee of $" . number_format($damageFee, 2) . " applied.";
+            } elseif ($condition === 'lost') {
+                $lostFee = $basePrice; // 100% Fee
+                $stmt = $this->db->prepare("INSERT INTO Penalties (user_id, record_id, amount, reason) VALUES (?, ?, ?, 'Lost Book Replacement')");
+                $stmt->execute([$user['user_id'], $loan['record_id'], $lostFee]);
+                $messages[] = "Lost book fee of $" . number_format($lostFee, 2) . " applied.";
             }
 
             $this->db->commit();
@@ -203,7 +228,6 @@ class CirculationController {
         $this->redirectBack();
     }
 
-    // Fetches status for display in the modal
     private function checkClearance() {
         $uniqueId = trim($_POST['clearance_user_id'] ?? '');
 
@@ -231,9 +255,8 @@ class CirculationController {
             $stmt->execute([$user['user_id']]);
             $unpaidFines = $stmt->fetchColumn() ?: 0.00;
 
-            // STORE DATA IN SESSION to display in the modal
             $_SESSION['clearance_data'] = [
-                'user_id' => $user['user_id'], // for the confirm button
+                'user_id' => $user['user_id'], 
                 'unique_id' => $user['unique_id'],
                 'name' => $user['first_name'] . ' ' . $user['last_name'],
                 'loan_count' => $loanCount,
@@ -247,17 +270,115 @@ class CirculationController {
         $this->redirectBack();
     }
 
-    // Actually processes the clearance (Finalizing it)
     private function processClearance() {
-        // In a real system, this might generate a PDF or set a 'is_cleared' flag in the Users table.
-        // For now, we'll just show a success message if they are eligible.
-        
         $userId = $_POST['user_id'] ?? '';
-        // Re-verify logic could go here for security...
-        
         $_SESSION['success'] = "User has been officially marked as CLEARED.";
-        unset($_SESSION['clearance_data']); // Clear the modal data
+        unset($_SESSION['clearance_data']); 
         $this->redirectBack();
+    }
+
+    // --- NEW FUNCTIONS ---
+
+    // API: Get details for the modal
+    private function getUserPenaltiesJson() {
+        header('Content-Type: application/json');
+        $userId = $_GET['user_id'] ?? '';
+
+        if (empty($userId)) {
+            echo json_encode(['success' => false, 'message' => 'No User ID provided']);
+            exit();
+        }
+
+        try {
+            // 1. Get User Info
+            $stmt = $this->db->prepare("SELECT user_id, unique_id, first_name, last_name FROM Users WHERE user_id = ?");
+            $stmt->execute([$userId]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$user) {
+                echo json_encode(['success' => false, 'message' => 'User not found']);
+                exit();
+            }
+
+            // 2. Get Unpaid Penalties
+            $stmt = $this->db->prepare("
+                SELECT penalty_id, amount, reason, created_at 
+                FROM Penalties 
+                WHERE user_id = ? AND is_paid = 0
+                ORDER BY created_at DESC
+            ");
+            $stmt->execute([$userId]);
+            $penalties = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Format dates nicely
+            foreach($penalties as &$p) {
+                $p['date'] = date('M d, Y', strtotime($p['created_at']));
+            }
+
+            echo json_encode([
+                'success' => true,
+                'user' => [
+                    'user_id' => $user['user_id'],
+                    'unique_id' => $user['unique_id'],
+                    'name' => $user['first_name'] . ' ' . $user['last_name']
+                ],
+                'penalties' => $penalties
+            ]);
+
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Database error']);
+        }
+        exit();
+    }
+
+    // Action: Pay ALL unpaid penalties for a user
+    private function processPayAll() {
+        $userId = $_POST['user_id'] ?? '';
+        $method = $_POST['payment_method'] ?? 'Cash';
+
+        if (empty($userId)) {
+            $_SESSION['error'] = "Invalid user for payment.";
+            $this->redirectBack();
+        }
+
+        try {
+            $this->db->beginTransaction();
+
+            // 1. Find all unpaid penalties for this user
+            $stmt = $this->db->prepare("SELECT penalty_id, amount FROM Penalties WHERE user_id = ? AND is_paid = 0");
+            $stmt->execute([$userId]);
+            $unpaid = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if (empty($unpaid)) {
+                throw new Exception("No unpaid penalties found for this user.");
+            }
+
+            $totalPaid = 0;
+
+            // 2. Process each one
+            foreach ($unpaid as $p) {
+                // Mark as Paid
+                $upd = $this->db->prepare("UPDATE Penalties SET is_paid = 1 WHERE penalty_id = ?");
+                $upd->execute([$p['penalty_id']]);
+
+                // Record Transaction
+                $ins = $this->db->prepare("INSERT INTO Payments (penalty_id, user_id, amount_paid, method) VALUES (?, ?, ?, ?)");
+                $ins->execute([$p['penalty_id'], $userId, $p['amount'], $method]);
+                
+                $totalPaid += $p['amount'];
+            }
+
+            $this->db->commit();
+            $_SESSION['success'] = "Successfully processed payment of $" . number_format($totalPaid, 2) . ". All penalties cleared.";
+
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            $_SESSION['error'] = "Payment failed: " . $e->getMessage();
+        }
+
+        // Redirect back to the penalties page
+        header("Location: /SmartLWA/app/views/staff_penalties.php");
+        exit();
     }
 
     private function redirectBack() {

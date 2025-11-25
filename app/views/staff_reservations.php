@@ -9,6 +9,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'staff') {
 
 require_once __DIR__ . '/../models/database.php';
 $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff');
+$search_term = $_GET['search'] ?? '';
 ?>
 
 <!DOCTYPE html>
@@ -41,8 +42,7 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff');
         <div class="sidebar-header">Smart Library</div>
         <a href="/SmartLWA/app/views/staff_dashboard.php">Dashboard</a>
         <a href="/SmartLWA/app/views/staff_reservations.php" class="active">Reservations</a>
-        <a href="#">Clearance</a>
-        <a href="#">Penalties</a>
+        <a href="/SmartLWA/app/views/staff_penalties.php">Penalties</a>
         <a href="/SmartLWA/app/controllers/AuthController.php?logout=true" style="margin-top: 50px;">Logout</a>
     </div>
 
@@ -52,6 +52,20 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff');
             <div>
                 <h1 class="fw-bold">Reservation Requests</h1>
                 <p class="text-muted">Process active reservations and prepare books for pickup.</p>
+            </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="row mb-4">
+            <div class="col-lg-6">
+                <form method="GET" action="/SmartLWA/app/views/staff_reservations.php" class="d-flex">
+                    <input class="form-control me-2" type="search" placeholder="Search Student Name or ID..." 
+                           name="search" value="<?php echo htmlspecialchars($search_term); ?>">
+                    <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i> Search</button>
+                    <?php if (!empty($search_term)): ?>
+                        <a href="/SmartLWA/app/views/staff_reservations.php" class="btn btn-outline-secondary ms-2">Clear</a>
+                    <?php endif; ?>
+                </form>
             </div>
         </div>
 
@@ -72,8 +86,8 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff');
                     <tbody>
                         <?php
                         try {
-                            // Fetch active reservations joined with user and book details
-                            $stmt = $pdo->prepare("
+                            // Build Query
+                            $sql = "
                                 SELECT 
                                     r.reservation_id, r.reservation_date, r.status,
                                     u.first_name, u.last_name, u.unique_id,
@@ -82,16 +96,25 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff');
                                 JOIN Users u ON r.user_id = u.user_id
                                 JOIN Books b ON r.book_id = b.book_id
                                 WHERE r.status IN ('active', 'ready_for_pickup')
-                                ORDER BY r.reservation_date ASC
-                            ");
-                            $stmt->execute();
+                            ";
+
+                            $params = [];
+                            if (!empty($search_term)) {
+                                $sql .= " AND (u.unique_id LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR b.title LIKE ?)";
+                                $term = '%' . $search_term . '%';
+                                $params = [$term, $term, $term, $term];
+                            }
+
+                            $sql .= " ORDER BY r.reservation_date ASC";
+
+                            $stmt = $pdo->prepare($sql);
+                            $stmt->execute($params);
 
                             if ($stmt->rowCount() > 0) {
                                 while ($row = $stmt->fetch()) {
                                     $status_class = ($row['status'] == 'active') ? 'bg-warning text-dark' : 'bg-success';
                                     $date = date('M d, Y', strtotime($row['reservation_date']));
                                     
-                                    // Prepare data for the modal
                                     $student_id = htmlspecialchars($row['unique_id']);
                                     $book_title = htmlspecialchars($row['title'], ENT_QUOTES);
                                     
@@ -110,7 +133,7 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff');
                                     echo "</tr>";
                                 }
                             } else {
-                                echo "<tr><td colspan='6' class='text-center text-muted py-5'>No active reservations found.</td></tr>";
+                                echo "<tr><td colspan='6' class='text-center text-muted py-5'>No active reservations found matching your search.</td></tr>";
                             }
                         } catch (PDOException $e) {
                             echo "<tr><td colspan='6' class='text-danger'>Error loading reservations.</td></tr>";
@@ -123,7 +146,6 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff');
     </div>
 
     <!-- FULFILL / BORROW MODAL -->
-    <!-- This reuses the logic from CirculationController to process the borrow -->
     <div class="modal fade" id="fulfillModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -145,8 +167,8 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff');
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Scan Book Barcode</label>
-                            <input type="text" class="form-control" name="book_id_input" placeholder="Scan copy barcode to checkout" required autofocus>
+                            <label class="form-label">Book ISBN</label>
+                            <input type="text" class="form-control" name="book_id_input" placeholder="Enter Book ISBN" required autofocus>
                         </div>
                     </div>
                     <div class="modal-footer">
