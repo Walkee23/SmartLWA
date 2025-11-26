@@ -42,6 +42,9 @@ class CirculationController {
             case 'get_user_penalties_json':
                 $this->getUserPenaltiesJson();
                 break;
+            case 'get_user_loans_json': // NEW: Fetch loans for modal
+                $this->getUserLoansJson();
+                break;
             default:
                 $_SESSION['error'] = "Invalid action.";
                 $this->redirectBack();
@@ -114,11 +117,9 @@ class CirculationController {
                                       WHERE user_id = ? AND book_id = ? AND status IN ('active', 'ready_for_pickup')");
             $stmt->execute([$user['user_id'], $book['book_id']]);
 
-            // --- FIX: REVOKE CLEARANCE STATUS ---
-            // Whenever a user borrows a book, their clearance must be revoked immediately.
+            // Revoke Clearance
             $stmt = $this->db->prepare("UPDATE Users SET is_cleared = 0 WHERE user_id = ?");
             $stmt->execute([$user['user_id']]);
-            // ------------------------------------
 
             $this->db->commit();
             $_SESSION['success'] = "Book '{$book['title']}' borrowed successfully! Due date: $dueDate";
@@ -196,7 +197,6 @@ class CirculationController {
             // 6. Handle Penalties
             $messages = [];
             $messages[] = "Book returned successfully.";
-
             $penaltyIncurred = false;
 
             if ($status === 'overdue') {
@@ -223,13 +223,10 @@ class CirculationController {
                 $penaltyIncurred = true;
             }
 
-            // --- OPTIONAL FIX: REVOKE CLEARANCE ON PENALTY ---
-            // If they returned a book but got a fine, they are not cleared.
             if ($penaltyIncurred) {
                 $stmt = $this->db->prepare("UPDATE Users SET is_cleared = 0 WHERE user_id = ?");
                 $stmt->execute([$user['user_id']]);
             }
-            // -------------------------------------------------
 
             $this->db->commit();
             $_SESSION['success'] = implode(" ", $messages);
@@ -361,6 +358,61 @@ class CirculationController {
         exit();
     }
 
+    // NEW FUNCTION: Fetch Active Loans for Modal
+    private function getUserLoansJson() {
+        header('Content-Type: application/json');
+        $userId = $_GET['user_id'] ?? '';
+
+        if (empty($userId)) {
+            echo json_encode(['success' => false, 'message' => 'No User ID provided']);
+            exit();
+        }
+
+        try {
+            $stmt = $this->db->prepare("SELECT user_id, unique_id, first_name, last_name FROM Users WHERE user_id = ?");
+            $stmt->execute([$userId]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$user) {
+                echo json_encode(['success' => false, 'message' => 'User not found']);
+                exit();
+            }
+
+            // Fetch active loans
+            $stmt = $this->db->prepare("
+                SELECT 
+                    br.due_date, 
+                    b.title, 
+                    b.isbn,
+                    bc.call_number
+                FROM BorrowingRecords br
+                JOIN Books b ON br.book_id = b.book_id
+                JOIN BookCopies bc ON br.copy_id = bc.copy_id
+                WHERE br.user_id = ? AND br.status = 'borrowed'
+                ORDER BY br.due_date ASC
+            ");
+            $stmt->execute([$userId]);
+            $loans = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach($loans as &$loan) {
+                $loan['due_date_formatted'] = date('M d, Y', strtotime($loan['due_date']));
+            }
+
+            echo json_encode([
+                'success' => true,
+                'user' => [
+                    'unique_id' => $user['unique_id'],
+                    'name' => $user['first_name'] . ' ' . $user['last_name']
+                ],
+                'loans' => $loans
+            ]);
+
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Database error']);
+        }
+        exit();
+    }
+
     private function processPayAll() {
         $userId = $_POST['user_id'] ?? '';
         $method = $_POST['payment_method'] ?? 'Cash';
@@ -417,3 +469,4 @@ class CirculationController {
 
 $controller = new CirculationController($pdo);
 $controller->handleRequest();
+?>

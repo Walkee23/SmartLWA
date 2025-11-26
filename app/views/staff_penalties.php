@@ -43,6 +43,7 @@ $search_term = $_GET['search'] ?? '';
         <div class="sidebar-header">Smart Library</div>
         <a href="/SmartLWA/app/views/staff_dashboard.php">Dashboard</a>
         <a href="/SmartLWA/app/views/staff_reservations.php">Reservations</a>
+        <a href="/SmartLWA/app/views/staff_returns.php">Returns</a>
         <a href="/SmartLWA/app/views/staff_penalties.php" class="active">Penalties</a>
         <a href="/SmartLWA/app/controllers/AuthController.php?logout=true">Logout</a>
     </div>

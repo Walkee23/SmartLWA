@@ -37,14 +37,17 @@ $search_term = $_GET['search'] ?? '';
 
 <body>
 
+    <!-- SIDEBAR -->
     <div class="sidebar">
         <div class="sidebar-header">Smart Library</div>
         <a href="/SmartLWA/app/views/staff_dashboard.php">Dashboard</a>
         <a href="/SmartLWA/app/views/staff_reservations.php" class="active">Reservations</a>
+        <a href="/SmartLWA/app/views/staff_returns.php">Returns</a>
         <a href="/SmartLWA/app/views/staff_penalties.php">Penalties</a>
         <a href="/SmartLWA/app/controllers/AuthController.php?logout=true">Logout</a>
     </div>
 
+    <!-- MAIN CONTENT -->
     <div class="main-content">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
@@ -53,6 +56,7 @@ $search_term = $_GET['search'] ?? '';
             </div>
         </div>
 
+        <!-- Search Bar -->
         <div class="row mb-4">
             <div class="col-lg-6">
                 <form method="GET" action="/SmartLWA/app/views/staff_reservations.php" class="d-flex">
@@ -66,6 +70,7 @@ $search_term = $_GET['search'] ?? '';
             </div>
         </div>
 
+        <!-- Reservations Table -->
         <div class="card p-4">
             <div class="table-responsive">
                 <table class="table table-hover align-middle">
@@ -143,6 +148,7 @@ $search_term = $_GET['search'] ?? '';
         </div>
     </div>
 
+    <!-- FULFILL / BORROW MODAL -->
     <div class="modal fade" id="fulfillModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -165,6 +171,7 @@ $search_term = $_GET['search'] ?? '';
 
                         <div class="mb-3">
                             <label class="form-label">Book ISBN</label>
+                            <!-- Added ID for JS targeting and value is now auto-filled -->
                             <input type="text" class="form-control" name="book_id_input" id="modal_book_isbn" placeholder="Enter Book ISBN" required>
                         </div>
                     </div>
