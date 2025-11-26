@@ -37,7 +37,6 @@ $search_term = $_GET['search'] ?? '';
 
 <body>
 
-    <!-- SIDEBAR -->
     <div class="sidebar">
         <div class="sidebar-header">Smart Library</div>
         <a href="/SmartLWA/app/views/staff_dashboard.php">Dashboard</a>
@@ -46,7 +45,6 @@ $search_term = $_GET['search'] ?? '';
         <a href="/SmartLWA/app/controllers/AuthController.php?logout=true">Logout</a>
     </div>
 
-    <!-- MAIN CONTENT -->
     <div class="main-content">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
@@ -55,7 +53,6 @@ $search_term = $_GET['search'] ?? '';
             </div>
         </div>
 
-        <!-- Search Bar -->
         <div class="row mb-4">
             <div class="col-lg-6">
                 <form method="GET" action="/SmartLWA/app/views/staff_reservations.php" class="d-flex">
@@ -69,7 +66,6 @@ $search_term = $_GET['search'] ?? '';
             </div>
         </div>
 
-        <!-- Reservations Table -->
         <div class="card p-4">
             <div class="table-responsive">
                 <table class="table table-hover align-middle">
@@ -117,6 +113,8 @@ $search_term = $_GET['search'] ?? '';
                                     
                                     $student_id = htmlspecialchars($row['unique_id']);
                                     $book_title = htmlspecialchars($row['title'], ENT_QUOTES);
+                                    // Fetch ISBN for autofill
+                                    $book_isbn  = htmlspecialchars($row['isbn'] ?? '');
                                     
                                     echo "<tr>";
                                     echo "<td>{$date}</td>";
@@ -126,7 +124,7 @@ $search_term = $_GET['search'] ?? '';
                                     echo "<td><span class='badge {$status_class}'>" . ucfirst(str_replace('_', ' ', $row['status'])) . "</span></td>";
                                     echo "<td>
                                             <button class='btn btn-sm btn-primary' 
-                                                onclick='openFulfillModal(\"{$student_id}\", \"{$book_title}\")'>
+                                                onclick='openFulfillModal(\"{$student_id}\", \"{$book_title}\", \"{$book_isbn}\")'>
                                                 <i class='fas fa-check-circle'></i> Fulfill / Borrow
                                             </button>
                                           </td>";
@@ -145,7 +143,6 @@ $search_term = $_GET['search'] ?? '';
         </div>
     </div>
 
-    <!-- FULFILL / BORROW MODAL -->
     <div class="modal fade" id="fulfillModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -168,7 +165,7 @@ $search_term = $_GET['search'] ?? '';
 
                         <div class="mb-3">
                             <label class="form-label">Book ISBN</label>
-                            <input type="text" class="form-control" name="book_id_input" placeholder="Enter Book ISBN" required autofocus>
+                            <input type="text" class="form-control" name="book_id_input" id="modal_book_isbn" placeholder="Enter Book ISBN" required>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -182,9 +179,14 @@ $search_term = $_GET['search'] ?? '';
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        function openFulfillModal(studentId, bookTitle) {
+        function openFulfillModal(studentId, bookTitle, isbn) {
+            // Autofill Student ID
             document.getElementById('modal_student_id').value = studentId;
+            // Display Title
             document.getElementById('modal_book_title').innerText = bookTitle;
+            // Autofill ISBN
+            document.getElementById('modal_book_isbn').value = isbn;
+            
             var myModal = new bootstrap.Modal(document.getElementById('fulfillModal'));
             myModal.show();
         }
