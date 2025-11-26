@@ -324,7 +324,7 @@ $sql .= " ORDER BY b.title ASC";
                                 <div class="col-md-6 mb-3"><label>Publisher</label><input type="text" name="publisher" class="form-control"></div>
                                 <div class="col-md-6 mb-3"><label>Year</label><input type="number" name="year" class="form-control"></div>
                             </div>
-                            <div class="mb-3"><label>Price ($)</label><input type="number" step="0.01" name="price" class="form-control" required></div>
+                            <div class="mb-3"><label>Price (₱)</label><input type="number" step="0.01" name="price" class="form-control" required></div> <!-- Changed to ₱ -->
                         </div>
                         <div class="modal-footer">
                             <button type="submit" class="btn btn-primary">Save Book</button>
@@ -354,7 +354,7 @@ $sql .= " ORDER BY b.title ASC";
                                 <div class="col-md-6 mb-3"><label>Publisher</label><input type="text" id="update_publisher" name="publisher" class="form-control"></div>
                                 <div class="col-md-6 mb-3"><label>Year</label><input type="number" id="update_year" name="year" class="form-control"></div>
                             </div>
-                            <div class="mb-3"><label>Price ($)</label><input type="number" step="0.01" id="update_price" name="price" class="form-control" required></div>
+                            <div class="mb-3"><label>Price (₱)</label><input type="number" step="0.01" id="update_price" name="price" class="form-control" required></div> <!-- Changed to ₱ -->
                         </div>
                         <div class="modal-footer">
                             <button type="submit" class="btn btn-primary">Save Changes</button>

@@ -130,7 +130,7 @@ $search_term = $_GET['search'] ?? '';
                                     echo "<tr>";
                                     echo "<td><span class='badge bg-light text-dark border'>{$row['unique_id']}</span></td>";
                                     echo "<td>" . htmlspecialchars($row['last_name'] . ', ' . $row['first_name']) . "</td>";
-                                    echo "<td class='text-danger fw-bold'>$$amount</td>";
+                                    echo "<td class='text-danger fw-bold'>₱$amount</td>"; // Changed to ₱
                                     echo "<td><span class='badge bg-warning text-dark'>{$row['pending_count']} Records</span></td>";
                                     echo "<td>
                                             <button class='btn btn-sm btn-info text-white' onclick='fetchUserDetails($userId)'>
@@ -185,7 +185,7 @@ $search_term = $_GET['search'] ?? '';
                             <tfoot class="table-light">
                                 <tr>
                                     <td colspan="2" class="text-end fw-bold">Total Due:</td>
-                                    <td class="text-end fw-bold text-danger fs-5" id="modal_total_due">$0.00</td>
+                                    <td class="text-end fw-bold text-danger fs-5" id="modal_total_due">₱0.00</td> <!-- Changed to ₱ -->
                                 </tr>
                             </tfoot>
                         </table>
@@ -246,13 +246,13 @@ $search_term = $_GET['search'] ?? '';
                                 <tr>
                                     <td>${p.date}</td>
                                     <td>${p.reason}</td>
-                                    <td class="text-end">$${parseFloat(p.amount).toFixed(2)}</td>
+                                    <td class="text-end">₱${parseFloat(p.amount).toFixed(2)}</td> <!-- Changed to ₱ -->
                                 </tr>
                             `;
                             tbody.innerHTML += row;
                         });
 
-                        document.getElementById('modal_total_due').innerText = '$' + total.toFixed(2);
+                        document.getElementById('modal_total_due').innerText = '₱' + total.toFixed(2); // Changed to ₱
 
                         // 3. Open Modal
                         var myModal = new bootstrap.Modal(document.getElementById('detailsModal'));

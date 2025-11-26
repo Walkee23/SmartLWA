@@ -222,7 +222,7 @@ $search_term = $_GET['search'] ?? '';
                                 <input class="form-check-input" type="radio" name="condition" value="overdue">
                                 <label class="form-check-label">
                                     <span class="fw-bold text-warning">Overdue</span>
-                                    <span class="text-danger ms-2 fw-bold">+ $50.00 Fine</span>
+                                    <span class="text-danger ms-2 fw-bold">+ ₱50.00 Fine</span> <!-- Changed to ₱ -->
                                 </label>
                             </div>
 
