@@ -49,17 +49,20 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Admin');
         /* Action Buttons Styling */
         .action-btn {
             height: 100px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.2rem; font-weight: 500; color: white;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-size: 1.1rem; font-weight: 500; color: white;
             border-radius: 8px; text-decoration: none;
             transition: transform 0.2s, box-shadow 0.2s;
-            border: none; width: 100%;
+            border: none; width: 100%; cursor: pointer;
         }
+        .action-btn i { font-size: 2rem; margin-bottom: 8px; }
         .action-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); color: white; }
+        
         .btn-add { background-color: #2563eb; }
         .btn-update { background-color: #16a34a; }
         .btn-archive { background-color: #dc2626; }
-        .btn-covers { background-color: #6f42c1; } /* New button color */
+        .btn-copies { background-color: #f59e0b; color: #fff; } /* Orange for Copies */
+        .btn-covers { background-color: #6f42c1; }
 
         .inventory-card {
             background: white; border-radius: 8px; border: 1px solid #e5e7eb;
@@ -100,19 +103,34 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Admin');
         <?php endif; ?>
 
         <!-- Action Buttons -->
-        <div class="row g-4 mb-5">
+        <div class="row g-4 mb-4">
             <div class="col-md-3">
-                <button class="action-btn btn-add" data-bs-toggle="modal" data-bs-target="#addBookModal">Add Book</button>
+                <button class="action-btn btn-add" data-bs-toggle="modal" data-bs-target="#addBookModal">
+                    <i class="fas fa-plus"></i> Add Book
+                </button>
             </div>
             <div class="col-md-3">
-                <button class="action-btn btn-update" data-bs-toggle="modal" data-bs-target="#updateBookModal">Update Book</button>
+                <button class="action-btn btn-update" data-bs-toggle="modal" data-bs-target="#updateBookModal">
+                    <i class="fas fa-edit"></i> Edit Details
+                </button>
+            </div>
+            <!-- NEW BUTTON: Manage Copies -->
+            <div class="col-md-3">
+                <button class="action-btn btn-copies" data-bs-toggle="modal" data-bs-target="#manageCopiesModal">
+                    <i class="fas fa-copy"></i> Manage Copies
+                </button>
             </div>
             <div class="col-md-3">
-                <button class="action-btn btn-archive" data-bs-toggle="modal" data-bs-target="#archiveBookModal">Archive Book</button>
+                <button class="action-btn btn-archive" data-bs-toggle="modal" data-bs-target="#archiveBookModal">
+                    <i class="fas fa-archive"></i> Archive
+                </button>
             </div>
-            <!-- New Button -->
-            <div class="col-md-3">
+        </div>
+
+        <div class="row mb-5">
+             <div class="col-md-3">
                 <button class="action-btn btn-covers" id="btnFetchCovers" onclick="updateBookCovers()">
+                    <i class="fas fa-image"></i>
                     <span id="coverBtnText">Update Covers</span>
                     <span id="coverBtnSpinner" class="spinner-border spinner-border-sm ms-2 d-none"></span>
                 </button>
@@ -129,7 +147,7 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Admin');
                             <th>Book ID</th>
                             <th>ISBN</th>
                             <th>Title</th>
-                            <th>Author</th>
+                            <th>Copies</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
@@ -137,6 +155,7 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Admin');
                     <tbody>
                         <?php
                         try {
+                            // Added total_copies to query
                             $stmt = $pdo->prepare("SELECT * FROM Books ORDER BY book_id DESC LIMIT 50");
                             $stmt->execute();
                             if ($stmt->rowCount() > 0) {
@@ -149,11 +168,11 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Admin');
                                     echo "<td>" . $row['book_id'] . "</td>";
                                     echo "<td>" . htmlspecialchars($row['isbn'] ?? '-') . "</td>";
                                     echo "<td>" . htmlspecialchars($row['title']) . "</td>";
-                                    echo "<td>" . htmlspecialchars($row['author']) . "</td>";
+                                    echo "<td><span class='badge bg-info text-dark'>" . $row['total_copies'] . "</span></td>";
                                     echo "<td><span class='badge $status_badge'>$status</span></td>";
                                     echo "<td>
-                                            <button class='btn btn-sm btn-outline-primary me-1' onclick='openUpdateModal($row_json)'><i class='fas fa-edit'></i></button>
-                                            <button class='btn btn-sm btn-outline-danger' onclick='openArchiveModal($row_json)'><i class='fas fa-trash'></i></button>
+                                            <button class='btn btn-sm btn-outline-primary me-1' onclick='openUpdateModal($row_json)' title='Edit'><i class='fas fa-edit'></i></button>
+                                            <button class='btn btn-sm btn-outline-warning' onclick='openManageCopiesModal($row_json)' title='Manage Copies'><i class='fas fa-copy'></i></button>
                                           </td>";
                                     echo "</tr>";
                                 }
@@ -176,10 +195,11 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Admin');
             <div class="modal-content">
                 <form action="/SmartLWA/app/controllers/BookController.php" method="POST">
                     <div class="modal-header">
-                        <h5 class="modal-title">Add New Book</h5>
+                        <h5 class="modal-title">Add New Book Title</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <p class="text-muted small">This adds a new <strong>Title</strong> to the library. Use "Manage Copies" to add physical copies.</p>
                         <input type="hidden" name="action" value="add_book">
                         <div class="mb-3"><label>ISBN</label><input type="text" name="isbn" class="form-control" required></div>
                         <div class="mb-3"><label>Title</label><input type="text" name="title" class="form-control" required></div>
@@ -188,10 +208,9 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Admin');
                             <div class="col-md-6 mb-3"><label>Publisher</label><input type="text" name="publisher" class="form-control"></div>
                             <div class="col-md-6 mb-3"><label>Year</label><input type="number" name="year" class="form-control"></div>
                         </div>
-                        <div class="mb-3"><label>Price (₱)</label><input type="number" step="0.01" name="price" class="form-control" required></div> <!-- Changed to ₱ -->
+                        <div class="mb-3"><label>Price (₱)</label><input type="number" step="0.01" name="price" class="form-control" required></div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-primary">Save Book</button>
                     </div>
                 </form>
@@ -205,18 +224,15 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Admin');
             <div class="modal-content">
                 <form action="/SmartLWA/app/controllers/BookController.php" method="POST">
                     <div class="modal-header bg-success text-white">
-                        <h5 class="modal-title">Update Book</h5>
+                        <h5 class="modal-title">Edit Book Details</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
-                        <!-- Search Section -->
                         <div class="input-group mb-3">
                             <input type="text" id="search_update_input" class="form-control" placeholder="Enter Book ID or ISBN">
                             <button class="btn btn-outline-secondary" type="button" onclick="fetchBookDetails('update')">Find</button>
                         </div>
                         <hr>
-                        
-                        <!-- Edit Form -->
                         <input type="hidden" name="action" value="update_book">
                         <input type="hidden" name="book_id" id="update_book_id">
                         
@@ -227,7 +243,7 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Admin');
                             <div class="col-md-6 mb-3"><label>Publisher</label><input type="text" id="update_publisher" name="publisher" class="form-control"></div>
                             <div class="col-md-6 mb-3"><label>Year</label><input type="number" id="update_year" name="year" class="form-control"></div>
                         </div>
-                        <div class="mb-3"><label>Price (₱)</label><input type="number" step="0.01" id="update_price" name="price" class="form-control" required></div> <!-- Changed to ₱ -->
+                        <div class="mb-3"><label>Price (₱)</label><input type="number" step="0.01" id="update_price" name="price" class="form-control" required></div>
                     </div>
                     <div class="modal-footer">
                         <button type="submit" class="btn btn-success">Save Changes</button>
@@ -237,7 +253,67 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Admin');
         </div>
     </div>
 
-    <!-- MODAL 3: ARCHIVE BOOK (With Search) -->
+    <!-- NEW MODAL: MANAGE COPIES -->
+    <div class="modal fade" id="manageCopiesModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title"><i class="fas fa-copy me-2"></i>Manage Copies</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Search for book to manage copies -->
+                    <div class="input-group mb-3">
+                        <input type="text" id="search_copies_input" class="form-control" placeholder="Enter Book ID or ISBN to manage">
+                        <button class="btn btn-secondary" type="button" onclick="searchForCopies()">Load Book</button>
+                    </div>
+
+                    <div id="copies_container" class="d-none">
+                        <div class="alert alert-light border">
+                            <h5 class="mb-1" id="copies_book_title">Book Title</h5>
+                            <small class="text-muted">Book ID: <span id="copies_book_id_display"></span></small>
+                            <input type="hidden" id="current_book_id_copies">
+                        </div>
+
+                        <!-- Add Copy Button -->
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold mb-0">Physical Copies</h6>
+                            <button class="btn btn-success btn-sm" onclick="addAutoCopy()">
+                                <i class="fas fa-plus-circle"></i> Add Auto-Generated Copy
+                            </button>
+                        </div>
+
+                        <!-- Copies Table -->
+                        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                            <table class="table table-sm table-bordered align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Call Number</th>
+                                        <th>Barcode</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="copies_table_body">
+                                    <!-- Populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div id="copies_loading" class="text-center py-4 d-none">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2 text-muted">Fetching copies...</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: ARCHIVE BOOK -->
     <div class="modal fade" id="archiveBookModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -247,8 +323,6 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Admin');
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
-                        <p>Search for a book to archive (remove from circulation).</p>
-                        <!-- Search Section -->
                         <div class="input-group mb-3">
                             <input type="text" id="search_archive_input" class="form-control" placeholder="Enter Book ID or ISBN">
                             <button class="btn btn-outline-secondary" type="button" onclick="fetchBookDetails('archive')">Find</button>
@@ -273,9 +347,8 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Admin');
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- Custom JS for Search & Filling Forms -->
     <script>
-        // 1. Helpers to simply fill form data (Does NOT open modal)
+        // --- EXISTING HELPER FUNCTIONS ---
         function fillUpdateForm(book) {
             document.getElementById('update_book_id').value = book.book_id;
             document.getElementById('update_isbn').value = book.isbn || '';
@@ -290,13 +363,10 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Admin');
             document.getElementById('archive_book_id').value = book.book_id;
             document.getElementById('archive_book_id_display').innerText = book.book_id;
             document.getElementById('archive_book_title').innerText = book.title;
-            
-            // Show preview and enable button
             document.getElementById('archive_preview').classList.remove('d-none');
             document.getElementById('btn_confirm_archive').disabled = false;
         }
 
-        // 2. Functions called when clicking the Table Icons (Fills AND Opens Modal)
         function openUpdateModal(book) {
             fillUpdateForm(book);
             var myModal = new bootstrap.Modal(document.getElementById('updateBookModal'));
@@ -309,24 +379,17 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Admin');
             myModal.show();
         }
 
-        // 3. AJAX Function for the "Find" buttons (Fills ONLY, does NOT re-open modal)
         function fetchBookDetails(type) {
             let inputId = type === 'update' ? 'search_update_input' : 'search_archive_input';
             let query = document.getElementById(inputId).value;
-
             if(!query) { alert("Please enter a Book ID or ISBN"); return; }
 
-            // Call the Controller
             fetch(`/SmartLWA/app/controllers/BookController.php?action=get_book_json&query=${query}`)
                 .then(response => response.json())
                 .then(data => {
                     if(data.success) {
-                        // Here is the fix: We call the fill functions, NOT the open functions
-                        if(type === 'update') {
-                            fillUpdateForm(data.data);
-                        } else {
-                            fillArchiveForm(data.data);
-                        }
+                        if(type === 'update') fillUpdateForm(data.data);
+                        else fillArchiveForm(data.data);
                     } else {
                         alert("Book not found!");
                     }
@@ -334,13 +397,139 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Admin');
                 .catch(err => console.error(err));
         }
 
-        // 4. Function to Update Book Covers (AJAX)
+        // --- NEW: COPIES MANAGEMENT LOGIC ---
+        
+        // 1. Triggered from Table Button
+        function openManageCopiesModal(book) {
+            // Set input and auto-search
+            document.getElementById('search_copies_input').value = book.book_id;
+            searchForCopies();
+            var myModal = new bootstrap.Modal(document.getElementById('manageCopiesModal'));
+            myModal.show();
+        }
+
+        // 2. Fetch Copies List
+        function searchForCopies() {
+            let query = document.getElementById('search_copies_input').value;
+            if(!query) return;
+
+            // Show loading, hide container
+            document.getElementById('copies_loading').classList.remove('d-none');
+            document.getElementById('copies_container').classList.add('d-none');
+
+            // First resolve ID if ISBN entered, or just use ID (Controller handles simple queries usually, 
+            // but our get_book_copies expects book_id. Let's first get ID.)
+            fetch(`/SmartLWA/app/controllers/BookController.php?action=get_book_json&query=${query}`)
+                .then(res => res.json())
+                .then(bookData => {
+                    if(!bookData.success) {
+                        alert("Book not found.");
+                        document.getElementById('copies_loading').classList.add('d-none');
+                        return;
+                    }
+                    
+                    let bookId = bookData.data.book_id;
+                    document.getElementById('current_book_id_copies').value = bookId;
+                    document.getElementById('copies_book_title').innerText = bookData.data.title;
+                    document.getElementById('copies_book_id_display').innerText = bookId;
+
+                    // Now fetch copies
+                    return fetch(`/SmartLWA/app/controllers/BookController.php?action=get_book_copies&book_id=${bookId}`);
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.success) {
+                        renderCopiesTable(data.copies);
+                        document.getElementById('copies_container').classList.remove('d-none');
+                    }
+                })
+                .catch(err => console.error(err))
+                .finally(() => {
+                    document.getElementById('copies_loading').classList.add('d-none');
+                });
+        }
+
+        function renderCopiesTable(copies) {
+            const tbody = document.getElementById('copies_table_body');
+            tbody.innerHTML = '';
+            
+            if(copies.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No physical copies found.</td></tr>';
+                return;
+            }
+
+            copies.forEach(copy => {
+                let badgeClass = copy.status === 'available' ? 'bg-success' : 'bg-warning text-dark';
+                let row = `
+                    <tr>
+                        <td><span class="font-monospace">${copy.call_number}</span></td>
+                        <td>${copy.barcode}</td>
+                        <td><span class="badge ${badgeClass}">${copy.status}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteCopy(${copy.copy_id})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        }
+
+        // 3. Add Auto Copy
+        function addAutoCopy() {
+            let bookId = document.getElementById('current_book_id_copies').value;
+            
+            let formData = new FormData();
+            formData.append('action', 'add_copy_auto');
+            formData.append('book_id', bookId);
+
+            fetch('/SmartLWA/app/controllers/BookController.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    // Refresh table
+                    searchForCopies(); // Reloads the list
+                } else {
+                    alert("Error: " + data.message);
+                }
+            })
+            .catch(err => console.error(err));
+        }
+
+        // 4. Delete Copy
+        function deleteCopy(copyId) {
+            if(!confirm("Are you sure you want to remove this specific copy?")) return;
+
+            let bookId = document.getElementById('current_book_id_copies').value;
+            let formData = new FormData();
+            formData.append('action', 'delete_copy');
+            formData.append('copy_id', copyId);
+            formData.append('book_id', bookId); // To update count
+
+            fetch('/SmartLWA/app/controllers/BookController.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    searchForCopies();
+                } else {
+                    alert("Error: " + data.message);
+                }
+            })
+            .catch(err => console.error(err));
+        }
+        
+        // --- COVERS LOGIC ---
         function updateBookCovers() {
             const btn = document.getElementById('btnFetchCovers');
             const spinner = document.getElementById('coverBtnSpinner');
             const text = document.getElementById('coverBtnText');
-
-            // Disable button and show spinner
             btn.disabled = true;
             spinner.classList.remove('d-none');
             text.innerText = "Updating...";
@@ -348,19 +537,11 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Admin');
             fetch('/SmartLWA/fetch_book_covers.php?mode=json')
                 .then(response => response.json())
                 .then(data => {
-                    if(data.success) {
-                        alert(data.message);
-                        location.reload(); // Reload to see new covers (if displayed)
-                    } else {
-                        alert("Error: " + data.message);
-                    }
+                    alert(data.message);
+                    location.reload();
                 })
-                .catch(err => {
-                    console.error('Error fetching covers:', err);
-                    alert("An error occurred while fetching covers.");
-                })
+                .catch(err => alert("Error updating covers."))
                 .finally(() => {
-                    // Re-enable button
                     btn.disabled = false;
                     spinner.classList.add('d-none');
                     text.innerText = "Update Covers";

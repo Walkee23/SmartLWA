@@ -35,14 +35,17 @@ class BookController
             case 'get_book_json':
                 $this->getBookAsJson(); 
                 break;
-            // --- NEW ACTIONS FOR COPIES ---
+            // --- ACTIONS FOR COPIES ---
             case 'get_book_copies':
                 $this->getBookCopies();
                 break;
-            case 'add_copy':
+            case 'add_copy': // Manual add (kept for compatibility)
                 $this->addCopy();
                 break;
-            case 'update_copy': // Added update capability for copies
+            case 'add_copy_auto': // NEW: Automatic generation
+                $this->addCopyAuto();
+                break;
+            case 'update_copy':
                 $this->updateCopy();
                 break;
             case 'delete_copy':
@@ -58,7 +61,6 @@ class BookController
     private function addBook()
     {
         try {
-            // Reverted to original simple insert
             $sql = "INSERT INTO Books (isbn, title, author, publisher, publication_year, price) VALUES (?, ?, ?, ?, ?, ?)";
             $stmt = $this->db->prepare($sql);
             $stmt->execute([
@@ -136,7 +138,7 @@ class BookController
         exit();
     }
 
-    // --- NEW METHODS FOR MANAGING COPIES ---
+    // --- METHODS FOR MANAGING COPIES ---
 
     private function getBookCopies() {
         header('Content-Type: application/json');
@@ -155,6 +157,72 @@ class BookController
             echo json_encode(['success' => true, 'copies' => $copies, 'book_title' => $book['title'] ?? 'Unknown']);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit();
+    }
+
+    // NEW: Automatically generate Copy Identifiers
+    private function addCopyAuto() {
+        header('Content-Type: application/json');
+        $bookId = $_POST['book_id'] ?? '';
+        
+        if (empty($bookId)) {
+            echo json_encode(['success' => false, 'message' => 'Book ID is missing.']);
+            exit();
+        }
+
+        try {
+            $this->db->beginTransaction();
+            
+            // 1. Get Book Details
+            $stmt = $this->db->prepare("SELECT author, title FROM Books WHERE book_id = ?");
+            $stmt->execute([$bookId]);
+            $book = $stmt->fetch();
+            
+            if (!$book) throw new Exception("Book not found.");
+            
+            // 2. Generate Call Number
+            // Pattern: [Author3Chars]-[BookID]-C[NextNum]
+            // Clean author name: remove spaces, take first 3 chars
+            $authorCode = strtoupper(substr(preg_replace('/[^a-zA-Z]/', '', $book['author']), 0, 3));
+            if (strlen($authorCode) < 3) $authorCode = str_pad($authorCode, 3, 'X');
+            
+            // Get current count to determine next copy number
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM BookCopies WHERE book_id = ?");
+            $stmt->execute([$bookId]);
+            $currentCount = $stmt->fetchColumn();
+            $nextNum = $currentCount + 1;
+            
+            // Format: AUTH-0000-C00
+            $callNumber = sprintf("%s-%04d-C%02d", $authorCode, $bookId, $nextNum); 
+            
+            // 3. Generate Barcode
+            // Pattern: BC-[BookID]-[Timestamp]-[Random] to ensure global uniqueness without locking table for ID prediction
+            $barcode = "BC-" . $bookId . "-" . time() . rand(10, 99);
+            
+            // 4. Insert
+            $stmt = $this->db->prepare("INSERT INTO BookCopies (book_id, call_number, barcode, status) VALUES (?, ?, ?, 'available')");
+            $stmt->execute([$bookId, $callNumber, $barcode]);
+            
+            // 5. Update Total Count
+            $this->db->prepare("UPDATE Books SET total_copies = total_copies + 1 WHERE book_id = ?")->execute([$bookId]);
+            
+            $this->db->commit();
+            
+            // Return success with the new data to update UI instantly
+            echo json_encode([
+                'success' => true, 
+                'message' => 'Copy generated successfully!',
+                'copy_data' => [
+                    'call_number' => $callNumber,
+                    'barcode' => $barcode,
+                    'status' => 'available'
+                ]
+            ]);
+            
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            echo json_encode(['success' => false, 'message' => "Error: " . $e->getMessage()]);
         }
         exit();
     }
