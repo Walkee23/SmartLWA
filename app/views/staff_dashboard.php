@@ -267,7 +267,7 @@ if (isset($_SESSION['clearance_data'])) {
         </div>
     </div>
 
-    <!-- Borrow/Return Modals Code (Keep previous implementation) -->
+    <!-- Borrow Modal -->
     <div class="modal fade" id="borrowModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -290,6 +290,7 @@ if (isset($_SESSION['clearance_data'])) {
         </div>
     </div>
 
+    <!-- Return Modal (Updated with Overdue Option) -->
     <div class="modal fade" id="returnModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -303,11 +304,39 @@ if (isset($_SESSION['clearance_data'])) {
                         <div class="mb-3"><label>Borrower User ID</label><input type="text" class="form-control" name="user_id_input" required></div>
                         <div class="mb-3"><label>Book ISBN</label><input type="text" class="form-control" name="book_id_input" required></div>
                         <hr>
-                        <label class="form-label fw-bold">Condition:</label>
-                        <div class="d-flex gap-3">
-                            <div class="form-check"><input class="form-check-input" type="radio" name="condition" value="good" checked><label>Good</label></div>
-                            <div class="form-check"><input class="form-check-input" type="radio" name="condition" value="damaged"><label class="text-warning">Damaged</label></div>
-                            <div class="form-check"><input class="form-check-input" type="radio" name="condition" value="lost"><label class="text-danger">Lost</label></div>
+                        <label class="form-label fw-bold">Condition & Penalties:</label>
+                        <div class="d-flex flex-column gap-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="condition" value="good" checked>
+                                <label class="form-check-label">
+                                    <span class="fw-bold text-success">Good Condition</span> 
+                                    <span class="text-muted ms-2">- No penalty</span>
+                                </label>
+                            </div>
+                            
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="condition" value="overdue">
+                                <label class="form-check-label">
+                                    <span class="fw-bold text-warning">Overdue</span>
+                                    <span class="text-danger ms-2 fw-bold">+ $50.00 Fine</span>
+                                </label>
+                            </div>
+
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="condition" value="damaged">
+                                <label class="form-check-label">
+                                    <span class="fw-bold text-warning">Damaged</span>
+                                    <span class="text-danger ms-2 fw-bold">+ 50% of Book Cost</span>
+                                </label>
+                            </div>
+                            
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="condition" value="lost">
+                                <label class="form-check-label">
+                                    <span class="fw-bold text-danger">Lost</span>
+                                    <span class="text-danger ms-2 fw-bold">+ 100% of Book Cost</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">

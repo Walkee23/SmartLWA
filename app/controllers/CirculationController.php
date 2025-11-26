@@ -181,7 +181,9 @@ class CirculationController {
 
             // 4. Update Record to 'returned'
             $returnDate = date('Y-m-d H:i:s');
-            $status = (strtotime($returnDate) > strtotime($loan['due_date'] . ' 23:59:59')) ? 'overdue' : 'returned';
+            // Check if overdue by date OR if "overdue" condition was manually selected
+            $isOverdueByDate = (strtotime($returnDate) > strtotime($loan['due_date'] . ' 23:59:59'));
+            $status = ($isOverdueByDate || $condition === 'overdue') ? 'overdue' : 'returned';
             
             $stmt = $this->db->prepare("UPDATE BorrowingRecords SET return_date = ?, status = ? WHERE record_id = ?");
             $stmt->execute([$returnDate, $status, $loan['record_id']]);
