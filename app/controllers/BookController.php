@@ -33,8 +33,22 @@ class BookController
                 $this->archiveBook();
                 break;
             case 'get_book_json':
-                $this->getBookAsJson(); // For the search feature
+                $this->getBookAsJson(); 
                 break;
+            // --- NEW ACTIONS FOR COPIES ---
+            case 'get_book_copies':
+                $this->getBookCopies();
+                break;
+            case 'add_copy':
+                $this->addCopy();
+                break;
+            case 'update_copy': // Added update capability for copies
+                $this->updateCopy();
+                break;
+            case 'delete_copy':
+                $this->deleteCopy();
+                break;
+            // -----------------------------
             default:
                 header("Location: /SmartLWA/app/views/librarian_dashboard.php");
                 exit();
@@ -44,6 +58,7 @@ class BookController
     private function addBook()
     {
         try {
+            // Reverted to original simple insert
             $sql = "INSERT INTO Books (isbn, title, author, publisher, publication_year, price) VALUES (?, ?, ?, ?, ?, ?)";
             $stmt = $this->db->prepare($sql);
             $stmt->execute([
@@ -66,7 +81,6 @@ class BookController
     {
         try {
             $book_id = $_POST['book_id'];
-
             $sql = "UPDATE Books SET isbn = ?, title = ?, author = ?, publisher = ?, publication_year = ?, price = ? WHERE book_id = ?";
             $stmt = $this->db->prepare($sql);
             $stmt->execute([
@@ -78,7 +92,6 @@ class BookController
                 $_POST['price'],
                 $book_id
             ]);
-
             $_SESSION['success'] = "Book ID $book_id updated successfully!";
         } catch (PDOException $e) {
             $_SESSION['error'] = "Error updating book.";
@@ -91,10 +104,8 @@ class BookController
     {
         try {
             $book_id = $_POST['book_id'];
-            // Archive means setting archived = 1 (Soft Delete)
             $stmt = $this->db->prepare("UPDATE Books SET archived = 1 WHERE book_id = ?");
             $stmt->execute([$book_id]);
-
             $_SESSION['success'] = "Book ID $book_id has been archived.";
         } catch (PDOException $e) {
             $_SESSION['error'] = "Error archiving book.";
@@ -103,11 +114,10 @@ class BookController
         exit();
     }
 
-    // Helper: Returns JSON data for AJAX calls
     private function getBookAsJson()
     {
         header('Content-Type: application/json');
-        $query = $_GET['query'] ?? ''; // Can be ID or ISBN
+        $query = $_GET['query'] ?? '';
 
         if (empty($query)) {
             echo json_encode(['success' => false, 'message' => 'Empty query']);
@@ -125,8 +135,88 @@ class BookController
         }
         exit();
     }
+
+    // --- NEW METHODS FOR MANAGING COPIES ---
+
+    private function getBookCopies() {
+        header('Content-Type: application/json');
+        $bookId = $_GET['book_id'] ?? '';
+        
+        try {
+            $stmt = $this->db->prepare("SELECT * FROM BookCopies WHERE book_id = ? ORDER BY copy_id ASC");
+            $stmt->execute([$bookId]);
+            $copies = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Also fetch book details for title display
+            $stmtBook = $this->db->prepare("SELECT title FROM Books WHERE book_id = ?");
+            $stmtBook->execute([$bookId]);
+            $book = $stmtBook->fetch();
+
+            echo json_encode(['success' => true, 'copies' => $copies, 'book_title' => $book['title'] ?? 'Unknown']);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit();
+    }
+
+    private function addCopy() {
+        header('Content-Type: application/json');
+        $bookId = $_POST['book_id'];
+        $callNum = $_POST['call_number'];
+        $barcode = $_POST['barcode'];
+
+        try {
+            $stmt = $this->db->prepare("INSERT INTO BookCopies (book_id, call_number, barcode, status) VALUES (?, ?, ?, 'available')");
+            $stmt->execute([$bookId, $callNum, $barcode]);
+            
+            // Update total count in Books table
+            $this->db->prepare("UPDATE Books SET total_copies = total_copies + 1 WHERE book_id = ?")->execute([$bookId]);
+
+            echo json_encode(['success' => true]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => "Error: " . $e->getMessage()]);
+        }
+        exit();
+    }
+
+    private function updateCopy() {
+        header('Content-Type: application/json');
+        $copyId = $_POST['copy_id'];
+        $callNum = $_POST['call_number'];
+        $barcode = $_POST['barcode'];
+        $status = $_POST['status'];
+
+        try {
+            $stmt = $this->db->prepare("UPDATE BookCopies SET call_number = ?, barcode = ?, status = ? WHERE copy_id = ?");
+            $stmt->execute([$callNum, $barcode, $status, $copyId]);
+            echo json_encode(['success' => true]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => "Error: " . $e->getMessage()]);
+        }
+        exit();
+    }
+
+    private function deleteCopy() {
+        header('Content-Type: application/json');
+        $copyId = $_POST['copy_id'];
+        $bookId = $_POST['book_id']; // Needed to update count
+
+        try {
+            $stmt = $this->db->prepare("DELETE FROM BookCopies WHERE copy_id = ?");
+            $stmt->execute([$copyId]);
+            
+            // Decrease count
+            $this->db->prepare("UPDATE Books SET total_copies = GREATEST(total_copies - 1, 0) WHERE book_id = ?")->execute([$bookId]);
+
+            echo json_encode(['success' => true]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => "Error: " . $e->getMessage()]);
+        }
+        exit();
+    }
 }
 
 // Instantiate and Run
 $controller = new BookController($pdo);
 $controller->handleRequest();
+?>

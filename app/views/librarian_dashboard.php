@@ -59,6 +59,7 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Admin');
         .btn-add { background-color: #2563eb; }
         .btn-update { background-color: #16a34a; }
         .btn-archive { background-color: #dc2626; }
+        .btn-covers { background-color: #6f42c1; } /* New button color */
 
         .inventory-card {
             background: white; border-radius: 8px; border: 1px solid #e5e7eb;
@@ -100,14 +101,21 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Admin');
 
         <!-- Action Buttons -->
         <div class="row g-4 mb-5">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <button class="action-btn btn-add" data-bs-toggle="modal" data-bs-target="#addBookModal">Add Book</button>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <button class="action-btn btn-update" data-bs-toggle="modal" data-bs-target="#updateBookModal">Update Book</button>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <button class="action-btn btn-archive" data-bs-toggle="modal" data-bs-target="#archiveBookModal">Archive Book</button>
+            </div>
+            <!-- New Button -->
+            <div class="col-md-3">
+                <button class="action-btn btn-covers" id="btnFetchCovers" onclick="updateBookCovers()">
+                    <span id="coverBtnText">Update Covers</span>
+                    <span id="coverBtnSpinner" class="spinner-border spinner-border-sm ms-2 d-none"></span>
+                </button>
             </div>
         </div>
 
@@ -270,12 +278,12 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Admin');
         // 1. Helpers to simply fill form data (Does NOT open modal)
         function fillUpdateForm(book) {
             document.getElementById('update_book_id').value = book.book_id;
-            document.getElementById('update_isbn').value = book.isbn;
+            document.getElementById('update_isbn').value = book.isbn || '';
             document.getElementById('update_title').value = book.title;
             document.getElementById('update_author').value = book.author;
-            document.getElementById('update_publisher').value = book.publisher;
-            document.getElementById('update_year').value = book.publication_year;
-            document.getElementById('update_price').value = book.price;
+            document.getElementById('update_publisher').value = book.publisher || '';
+            document.getElementById('update_year').value = book.publication_year || '';
+            document.getElementById('update_price').value = book.price || '';
         }
 
         function fillArchiveForm(book) {
@@ -324,6 +332,39 @@ $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Admin');
                     }
                 })
                 .catch(err => console.error(err));
+        }
+
+        // 4. Function to Update Book Covers (AJAX)
+        function updateBookCovers() {
+            const btn = document.getElementById('btnFetchCovers');
+            const spinner = document.getElementById('coverBtnSpinner');
+            const text = document.getElementById('coverBtnText');
+
+            // Disable button and show spinner
+            btn.disabled = true;
+            spinner.classList.remove('d-none');
+            text.innerText = "Updating...";
+
+            fetch('/SmartLWA/fetch_book_covers.php?mode=json')
+                .then(response => response.json())
+                .then(data => {
+                    if(data.success) {
+                        alert(data.message);
+                        location.reload(); // Reload to see new covers (if displayed)
+                    } else {
+                        alert("Error: " + data.message);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching covers:', err);
+                    alert("An error occurred while fetching covers.");
+                })
+                .finally(() => {
+                    // Re-enable button
+                    btn.disabled = false;
+                    spinner.classList.add('d-none');
+                    text.innerText = "Update Covers";
+                });
         }
     </script>
 </body>
