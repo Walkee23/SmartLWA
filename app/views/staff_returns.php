@@ -208,19 +208,38 @@ $search_term = $_GET['search'] ?? '';
                         </div>
                         
                         <hr>
-                        <label class="form-label fw-bold">Condition:</label>
-                        <div class="d-flex gap-3">
+                        <label class="form-label fw-bold">Condition & Penalties:</label>
+                        <div class="d-flex flex-column gap-2">
                             <div class="form-check">
                                 <input class="form-check-input" type="radio" name="condition" value="good" checked>
-                                <label>Good</label>
+                                <label class="form-check-label">
+                                    <span class="fw-bold text-success">Good Condition</span> 
+                                    <span class="text-muted ms-2">- No penalty</span>
+                                </label>
                             </div>
+                            
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="condition" value="overdue">
+                                <label class="form-check-label">
+                                    <span class="fw-bold text-warning">Overdue</span>
+                                    <span class="text-danger ms-2 fw-bold">+ $50.00 Fine</span>
+                                </label>
+                            </div>
+
                             <div class="form-check">
                                 <input class="form-check-input" type="radio" name="condition" value="damaged">
-                                <label class="text-warning">Damaged</label>
+                                <label class="form-check-label">
+                                    <span class="fw-bold text-warning">Damaged</span>
+                                    <span class="text-danger ms-2 fw-bold">+ 50% of Book Cost</span>
+                                </label>
                             </div>
+                            
                             <div class="form-check">
                                 <input class="form-check-input" type="radio" name="condition" value="lost">
-                                <label class="text-danger">Lost</label>
+                                <label class="form-check-label">
+                                    <span class="fw-bold text-danger">Lost</span>
+                                    <span class="text-danger ms-2 fw-bold">+ 100% of Book Cost</span>
+                                </label>
                             </div>
                         </div>
                     </div>

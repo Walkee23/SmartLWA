@@ -10,6 +10,12 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'staff') {
 require_once __DIR__ . '/../models/database.php';
 $first_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff');
 $clearanceData = $_SESSION['clearance_data'] ?? null;
+
+// FIX: Clear the clearance data from session immediately so it doesn't reappear 
+// on page refresh or when navigating back from other tabs.
+if (isset($_SESSION['clearance_data'])) {
+    unset($_SESSION['clearance_data']);
+}
 ?>
 
 <!DOCTYPE html>
