@@ -33,7 +33,7 @@ class BookController
                 $this->archiveBook();
                 break;
             case 'get_book_json':
-                $this->getBookAsJson(); 
+                $this->getBookAsJson();
                 break;
             // --- ACTIONS FOR COPIES ---
             case 'get_book_copies':
@@ -61,7 +61,8 @@ class BookController
     private function addBook()
     {
         try {
-            $sql = "INSERT INTO Books (isbn, title, author, publisher, publication_year, price) VALUES (?, ?, ?, ?, ?, ?)";
+            // Force total_copies to 0 on creation
+            $sql = "INSERT INTO Books (isbn, title, author, publisher, publication_year, price, total_copies) VALUES (?, ?, ?, ?, ?, ?, 0)";
             $stmt = $this->db->prepare($sql);
             $stmt->execute([
                 $_POST['isbn'],
@@ -140,15 +141,16 @@ class BookController
 
     // --- METHODS FOR MANAGING COPIES ---
 
-    private function getBookCopies() {
+    private function getBookCopies()
+    {
         header('Content-Type: application/json');
         $bookId = $_GET['book_id'] ?? '';
-        
+
         try {
             $stmt = $this->db->prepare("SELECT * FROM BookCopies WHERE book_id = ? ORDER BY copy_id ASC");
             $stmt->execute([$bookId]);
             $copies = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
+
             // Also fetch book details for title display
             $stmtBook = $this->db->prepare("SELECT title FROM Books WHERE book_id = ?");
             $stmtBook->execute([$bookId]);
@@ -162,10 +164,11 @@ class BookController
     }
 
     // NEW: Automatically generate Copy Identifiers
-    private function addCopyAuto() {
+    private function addCopyAuto()
+    {
         header('Content-Type: application/json');
         $bookId = $_POST['book_id'] ?? '';
-        
+
         if (empty($bookId)) {
             echo json_encode(['success' => false, 'message' => 'Book ID is missing.']);
             exit();
@@ -173,45 +176,45 @@ class BookController
 
         try {
             $this->db->beginTransaction();
-            
+
             // 1. Get Book Details
             $stmt = $this->db->prepare("SELECT author, title FROM Books WHERE book_id = ?");
             $stmt->execute([$bookId]);
             $book = $stmt->fetch();
-            
+
             if (!$book) throw new Exception("Book not found.");
-            
+
             // 2. Generate Call Number
             // Pattern: [Author3Chars]-[BookID]-C[NextNum]
             // Clean author name: remove spaces, take first 3 chars
             $authorCode = strtoupper(substr(preg_replace('/[^a-zA-Z]/', '', $book['author']), 0, 3));
             if (strlen($authorCode) < 3) $authorCode = str_pad($authorCode, 3, 'X');
-            
+
             // Get current count to determine next copy number
             $stmt = $this->db->prepare("SELECT COUNT(*) FROM BookCopies WHERE book_id = ?");
             $stmt->execute([$bookId]);
             $currentCount = $stmt->fetchColumn();
             $nextNum = $currentCount + 1;
-            
+
             // Format: AUTH-0000-C00
-            $callNumber = sprintf("%s-%04d-C%02d", $authorCode, $bookId, $nextNum); 
-            
+            $callNumber = sprintf("%s-%04d-C%02d", $authorCode, $bookId, $nextNum);
+
             // 3. Generate Barcode
             // Pattern: BC-[BookID]-[Timestamp]-[Random] to ensure global uniqueness without locking table for ID prediction
             $barcode = "BC-" . $bookId . "-" . time() . rand(10, 99);
-            
+
             // 4. Insert
             $stmt = $this->db->prepare("INSERT INTO BookCopies (book_id, call_number, barcode, status) VALUES (?, ?, ?, 'available')");
             $stmt->execute([$bookId, $callNumber, $barcode]);
-            
+
             // 5. Update Total Count
             $this->db->prepare("UPDATE Books SET total_copies = total_copies + 1 WHERE book_id = ?")->execute([$bookId]);
-            
+
             $this->db->commit();
-            
+
             // Return success with the new data to update UI instantly
             echo json_encode([
-                'success' => true, 
+                'success' => true,
                 'message' => 'Copy generated successfully!',
                 'copy_data' => [
                     'call_number' => $callNumber,
@@ -219,7 +222,6 @@ class BookController
                     'status' => 'available'
                 ]
             ]);
-            
         } catch (Exception $e) {
             $this->db->rollBack();
             echo json_encode(['success' => false, 'message' => "Error: " . $e->getMessage()]);
@@ -227,7 +229,8 @@ class BookController
         exit();
     }
 
-    private function addCopy() {
+    private function addCopy()
+    {
         header('Content-Type: application/json');
         $bookId = $_POST['book_id'];
         $callNum = $_POST['call_number'];
@@ -236,7 +239,7 @@ class BookController
         try {
             $stmt = $this->db->prepare("INSERT INTO BookCopies (book_id, call_number, barcode, status) VALUES (?, ?, ?, 'available')");
             $stmt->execute([$bookId, $callNum, $barcode]);
-            
+
             // Update total count in Books table
             $this->db->prepare("UPDATE Books SET total_copies = total_copies + 1 WHERE book_id = ?")->execute([$bookId]);
 
@@ -247,7 +250,8 @@ class BookController
         exit();
     }
 
-    private function updateCopy() {
+    private function updateCopy()
+    {
         header('Content-Type: application/json');
         $copyId = $_POST['copy_id'];
         $callNum = $_POST['call_number'];
@@ -264,7 +268,8 @@ class BookController
         exit();
     }
 
-    private function deleteCopy() {
+    private function deleteCopy()
+    {
         header('Content-Type: application/json');
         $copyId = $_POST['copy_id'];
         $bookId = $_POST['book_id']; // Needed to update count
@@ -272,7 +277,7 @@ class BookController
         try {
             $stmt = $this->db->prepare("DELETE FROM BookCopies WHERE copy_id = ?");
             $stmt->execute([$copyId]);
-            
+
             // Decrease count
             $this->db->prepare("UPDATE Books SET total_copies = GREATEST(total_copies - 1, 0) WHERE book_id = ?")->execute([$bookId]);
 
@@ -287,4 +292,3 @@ class BookController
 // Instantiate and Run
 $controller = new BookController($pdo);
 $controller->handleRequest();
-?>
