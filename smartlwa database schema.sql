@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 09, 2025 at 04:18 AM
+-- Generation Time: Dec 09, 2025 at 03:48 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -20,8 +20,6 @@ SET time_zone = "+00:00";
 --
 -- Database: `smartlwa`
 --
-CREATE DATABASE IF NOT EXISTS `smartlwa` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
-USE `smartlwa`;
 
 -- --------------------------------------------------------
 
@@ -276,7 +274,8 @@ INSERT INTO `borrowingrecords` (`record_id`, `copy_id`, `book_id`, `user_id`, `b
 (9, 1060, 105, 5, '2025-11-26 14:28:13', '2025-12-03', '2025-11-26 08:58:02', 'returned', NULL),
 (10, 3, 2, 2, '2025-11-26 14:28:44', '2025-12-03', '2025-11-26 07:42:50', 'returned', NULL),
 (11, 1071, 106, 2, '2025-11-26 14:32:49', '2025-12-03', '2025-11-26 07:43:12', 'returned', NULL),
-(12, 1119, 111, 5, '2025-11-28 09:25:12', '2025-12-05', NULL, 'borrowed', NULL);
+(12, 1119, 111, 5, '2025-11-28 09:25:12', '2025-12-05', NULL, 'borrowed', NULL),
+(13, 1077, 107, 5, '2025-12-09 22:45:11', '2025-12-16', '2025-12-09 15:45:19', 'returned', NULL);
 
 -- --------------------------------------------------------
 
@@ -355,16 +354,11 @@ CREATE TABLE `reservations` (
 --
 
 INSERT INTO `reservations` (`reservation_id`, `book_id`, `user_id`, `reservation_date`, `expiry_date`, `status`) VALUES
-(16, 1, 5, '2025-10-20 13:23:08', '2025-10-27 07:23:08', 'fulfilled'),
 (17, 3, 4, '2025-10-20 13:23:25', '2025-10-27 07:23:25', 'fulfilled'),
-(18, 110, 5, '2025-11-25 22:30:32', '2025-12-02 15:30:32', 'cancelled'),
-(19, 106, 5, '2025-11-26 13:13:16', '2025-12-03 06:13:16', 'fulfilled'),
-(20, 108, 5, '2025-11-26 13:57:33', '2025-12-03 06:57:33', 'fulfilled'),
-(21, 3, 5, '2025-11-26 14:05:54', '2025-12-03 07:05:54', 'fulfilled'),
-(22, 105, 5, '2025-11-26 14:23:56', '2025-12-03 07:23:56', 'fulfilled'),
 (23, 2, 2, '2025-11-26 14:28:27', '2025-12-03 07:28:27', 'fulfilled'),
 (24, 106, 2, '2025-11-26 14:31:17', '2025-12-03 07:31:17', 'fulfilled'),
-(27, 111, 5, '2025-11-28 09:23:51', '2025-12-05 02:23:51', 'fulfilled');
+(27, 111, 5, '2025-11-28 09:23:51', '2025-12-05 02:23:51', 'fulfilled'),
+(32, 107, 5, '2025-12-09 22:44:12', '2025-12-16 15:44:12', 'fulfilled');
 
 -- --------------------------------------------------------
 
@@ -454,7 +448,6 @@ ALTER TABLE `penalties`
 --
 ALTER TABLE `reservations`
   ADD PRIMARY KEY (`reservation_id`),
-  ADD UNIQUE KEY `user_book_active_reservation` (`user_id`,`book_id`),
   ADD KEY `book_id` (`book_id`);
 
 --
@@ -491,7 +484,7 @@ ALTER TABLE `books`
 -- AUTO_INCREMENT for table `borrowingrecords`
 --
 ALTER TABLE `borrowingrecords`
-  MODIFY `record_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `record_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT for table `payments`
@@ -509,7 +502,7 @@ ALTER TABLE `penalties`
 -- AUTO_INCREMENT for table `reservations`
 --
 ALTER TABLE `reservations`
-  MODIFY `reservation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
+  MODIFY `reservation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
 
 --
 -- AUTO_INCREMENT for table `users`
