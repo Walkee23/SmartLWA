@@ -66,7 +66,8 @@ SmartLWA/
 │   └── views/            # Role-specific Dashboards and UI components
 ├── public/
 │   ├── index.php         # Application entry point
-│   └── src/              # Assets and images
+│   ├── css/
+│   └── js/              # Assets and images
 ├── config.php            # Database configuration constants
 ├── fetch_book_covers.php # Script to sync book covers
 ├── generatehash.php      # Utility for password hashing
