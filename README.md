@@ -1,157 +1,123 @@
-Smart Library Web System (SmartLWA)
+# 📚 Smart Library Web System (SmartLWA)
 
-SmartLWA is a web-based library management system designed to streamline library operations for students, teachers, librarians, and staff. This project was developed to meet specific academic requirements for a multi-user environment with role-based access control and specific borrowing rules.
+> **Project Title:** SMARTLWA - Smart Library Web System for Multi-User Management
 
-📖 Project Overview
+A robust, role-based **Library Management System** built with **Vanilla PHP** and **MySQL**. This application is designed to streamline library operations for Students, Teachers, Librarians, and Staff, enforcing specific academic borrowing rules and automating clearance procedures.
 
-The objective of this system is to manage library operations for four distinct user roles, ensuring efficient handling of borrowing, returning, reservations, and user clearance.
+---
 
-Key Goals
+## 🚀 Project Overview
 
-Role-Based Management: distinct interfaces and permissions for Students, Teachers, Librarians, and Staff.
+The **SmartLWA** system manages the complete lifecycle of library resources—from book acquisition to borrowing, returning, and penalty calculation. It is architected to support four distinct user roles, each with specific privileges and business rules defined in the project brief.
 
-Inventory Control: Real-time management of book copies and metadata.
+### 🔑 Key Features
 
-Circulation Management: Handling loans, returns, and penalty calculations.
+* **Role-Based Access Control (RBAC):** Secure login redirection for Students, Teachers, Librarians, and Staff.
+* **Automated Circulation:** Logic for borrowing, returning, and handling overdue items.
+* **Real-Time Inventory:** Automatic tracking of available vs. total book copies.
+* **Penalty & Clearance System:** Automated calculation of fines for overdue/damaged books and status checking for user clearance.
+* **Metadata Integration:** Automatic fetching of book covers using the Open Library API.
 
-Clearance Automation: Automated checking of liabilities (unpaid fines or unreturned books) for student/teacher clearance.
+---
 
-🚀 Features by Role
+## 👥 User Roles & Business Rules
 
-🎓 Student
+The system enforces specific operational rules based on the user type:
 
-Borrowing Limit: Restricted to borrowing up to 3 books per semester.
+### 🎓 1. Student
+* **Borrowing Limit:** Strictly restricted to borrowing **up to 3 books** per semester.
+* **Reservations:** Can browse the catalog and reserve books online.
+* **Clearance:** Must return all books and pay outstanding penalties to be marked as "Cleared".
 
-Reservations: Ability to browse the catalog and reserve books online.
+### 🍎 2. Teacher
+* **Borrowing Limit:** **Unlimited** book borrowing privileges.
+* **Clearance:** Mandatory return of all borrowed items at the end of the academic semester.
+* **Resource Management:** Access to reserve materials for class requirements.
 
-Dashboard: View current loans, due dates, and active reservations.
+### 📖 3. Librarian
+* **Inventory Control:** Full authority to **add, update, and archive** book titles.
+* **Copy Management:** Manage physical copies (barcodes, call numbers).
+* **Digital Assets:** Updates book cover images via API integration.
 
-Clearance: Must return all books and pay fines to be marked as "Cleared".
+### 🛡️ 4. Staff
+* **Circulation Desk:** Facilitates the physical borrowing and returning process.
+* **Penalty Management:** Processes fines for overdue, damaged, or lost books.
+* **Clearance Processing:** Audits borrower records and officially clears users who have settled liabilities.
 
-👨‍🏫 Teacher
+---
 
-Unlimited Borrowing: No cap on the number of books borrowed.
+## 🛠️ Technology Stack
 
-Semester Clearance: Must return all books by the end of the academic semester.
+* **Backend:** Vanilla PHP 8.0+ (MVC Architecture)
+* **Database:** MySQL / MariaDB
+* **Frontend:** HTML5, CSS3, JavaScript (ES6)
+* **Styling:** Bootstrap 5.3.2 (Responsive)
+* **Server:** Apache (requires `mod_rewrite`)
 
-Resource Management: Access to reserve books for class requirements.
+---
 
-📚 Librarian
+## 📂 Folder Structure
 
-Inventory Management: Add, update, and archive book titles.
-
-Copy Management: Manage physical copies (barcodes, call numbers) for each title.
-
-Metadata: Auto-fetch book covers via Open Library API.
-
-💼 Staff
-
-Circulation Desk: Facilitate physical borrowing and returning of books.
-
-Penalty System: Calculate and process payments for overdue, damaged, or lost books.
-
-Clearance Processing: View borrower status and officially clear users who have no outstanding liabilities.
-
-🛠️ Technology Stack
-
-Backend: PHP (Native/Vanilla) using PDO for database interactions.
-
-Frontend: HTML5, CSS3, JavaScript.
-
-Styling: Bootstrap 5.3.2 (Responsive Design).
-
-Database: MySQL / MariaDB.
-
-Architecture: MVC (Model-View-Controller) pattern.
-
-📂 Project Structure
-
+```text
 SmartLWA/
 ├── app/
-│   ├── controllers/   # Logic for Auth, Books, Circulation, etc.
-│   ├── models/        # Database connection and queries
-│   └── views/         # Role-specific dashboards and UI pages
-├── public/            # Entry point (index.php)
-├── config.php         # Database configuration
-├── .htaccess          # URL rewriting rules
-└── smartlwa database schema.sql # Database import file
+│   ├── controllers/      # Logic for Auth, Books, and Circulation
+│   ├── models/           # Database connection instance
+│   └── views/            # Role-specific Dashboards and UI components
+├── public/
+│   ├── index.php         # Application entry point
+│   └── src/              # Assets and images
+├── config.php            # Database configuration constants
+├── fetch_book_covers.php # Script to sync book covers
+├── generatehash.php      # Utility for password hashing
+├── smartlwa database schema.sql  # Database import file
+└── .htaccess             # URL routing rules
+```
 
+---
 
-⚙️ Installation & Setup
+## ⚙️ Installation Guide
 
-Clone the Repository
+### 1. Clone the Repository
 
-git clone [https://github.com/yourusername/smartlwa.git](https://github.com/yourusername/smartlwa.git)
+```text
+git clone https://github.com/Walkee23/SmartLWA.git
+cd SmartLWA
+```
 
+### 2. Database Setup
+* Create a MySQL database named **SmartLWA**.
+* Import the SQL file smartlwa database schema.sql into your database.
 
-Database Setup
+### 3. Configuration
+* Open config.php and verify your database credentials:
 
-Create a MySQL database named SmartLWA.
-
-Import the smartlwa database schema.sql file located in the root directory.
-
-Note: The SQL file includes default users for testing (e.g., student, teacher, staff, librarian).
-
-Configuration
-
-Open config.php.
-
-Update the database credentials if necessary:
-
+```text
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'SmartLWA');
 define('DB_USER', 'root');
 define('DB_PASS', '');
+```
 
+### 4. Server Configuration
+* Ensure your Apache server has mod_rewrite enabled.
+* Place the project in your web root (e.g., htdocs).
+* Access via browser: http://localhost/SmartLWA/
 
-Server Requirements
+---
 
-PHP 8.0 or higher.
+## 🔐 Default Credentials
 
-Apache Server (XAMPP/WAMP/MAMP).
+The system comes pre-seeded with users for testing purposes. All accounts share the same password for demonstration ease.
+| Role      | Email                   | Password          |
+|-----------|-------------------------|-------------------|
+| Student   | john.doe@lwa.edu        | password123       |
+| Teacher   | mark.teacher@lwa.edu    | password123       |
+| Librarian | maria.librarian@lwa.edu | password123       |
+| Staff     | ella.staff@lwa.edu      | password123       |
 
-Important: Ensure mod_rewrite is enabled in Apache for the .htaccess routing to work correctly.
+*Note: Passwords are securely hashed in the database. Use generatehash.php if you need to create new credentials.*
 
-Access the App
+---
 
-Place the project folder in your web root (e.g., htdocs).
-
-Navigate to http://localhost/SmartLWA/ in your browser.
-
-🧪 Default Login Credentials (For Testing)
-
-Role
-
-Email
-
-Password
-
-Librarian
-
-maria.librarian@lwa.edu
-
-password123
-
-Staff
-
-ella.staff@lwa.edu
-
-password123
-
-Teacher
-
-mark.teacher@lwa.edu
-
-password123
-
-Student
-
-john.doe@lwa.edu
-
-password123
-
-(Note: Passwords in the database are hashed. If you need to reset them, use the generatehash.php utility included in the repo.)
-
-📝 License
-
-This project is for educational purposes as part of the Library System Activity.
+**⚠️ Disclaimer:** This **Smart Library Web System** was developed for **educational and academic purposes only** as a requirement for the *Library Web Application* project brief. It is intended as a school activity demonstration and is not designed for commercial use or production environments. All data, user accounts, and book records included in this repository are fictitious and used solely for testing and demonstration purposes.
