@@ -4,7 +4,7 @@ require_once __DIR__ . '/../models/database.php';
 
 // Security: Only Staff or Librarians can access circulation
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['staff', 'librarian'])) {
-    if(isset($_GET['action']) && strpos($_GET['action'], 'json') !== false) {
+    if (isset($_GET['action']) && strpos($_GET['action'], 'json') !== false) {
         header('Content-Type: application/json');
         echo json_encode(['success' => false, 'message' => 'Unauthorized']);
         exit();
@@ -13,14 +13,17 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['staff', 'libr
     exit();
 }
 
-class CirculationController {
+class CirculationController
+{
     private $db;
 
-    public function __construct($db) {
+    public function __construct($db)
+    {
         $this->db = $db;
     }
 
-    public function handleRequest() {
+    public function handleRequest()
+    {
         $action = $_REQUEST['action'] ?? '';
 
         switch ($action) {
@@ -31,7 +34,7 @@ class CirculationController {
                 $this->processReturn();
                 break;
             case 'clearance':
-                $this->checkClearance(); 
+                $this->checkClearance();
                 break;
             case 'process_clearance':
                 $this->processClearance();
@@ -51,7 +54,8 @@ class CirculationController {
         }
     }
 
-    private function processBorrow() {
+    private function processBorrow()
+    {
         $uniqueId = trim($_POST['user_id_input'] ?? '');
         $isbn = trim($_POST['book_id_input'] ?? '');
 
@@ -85,7 +89,7 @@ class CirculationController {
             $stmt = $this->db->prepare("SELECT copy_id, barcode, status FROM BookCopies WHERE book_id = ? AND status = 'available' LIMIT 1");
             $stmt->execute([$book['book_id']]);
             $copy = $stmt->fetch();
-            
+
             if (!$copy) {
                 throw new Exception("Book '{$book['title']}' found, but no physical copies are currently available.");
             }
@@ -101,12 +105,22 @@ class CirculationController {
                 }
             }
 
-            // 5. Calculate Due Date (e.g., 7 days from now)
-            $dueDate = date('Y-m-d', strtotime('+7 days'));
+            // 5. Calculate Due Date (Fetch Active Semester End Date)
+            $stmt = $this->db->prepare("SELECT period_id, end_date FROM AcademicPeriods WHERE is_active = 1 LIMIT 1");
+            $stmt->execute();
+            $period = $stmt->fetch();
 
-            // 6. Create Record
-            $stmt = $this->db->prepare("INSERT INTO BorrowingRecords (copy_id, book_id, user_id, due_date, status) VALUES (?, ?, ?, ?, 'borrowed')");
-            $stmt->execute([$copy['copy_id'], $book['book_id'], $user['user_id'], $dueDate]);
+            if (!$period) {
+                throw new Exception("No active academic period found. Cannot determine due date.");
+            }
+
+            $dueDate = $period['end_date'];
+            $periodId = $period['period_id']; // Capture ID for the record
+
+            // 6. Create Record (Updated to include period_id)
+            // Note: I added 'period_id' to the INSERT statement to track which semester this loan belongs to.
+            $stmt = $this->db->prepare("INSERT INTO BorrowingRecords (copy_id, book_id, user_id, due_date, status, period_id) VALUES (?, ?, ?, ?, 'borrowed', ?)");
+            $stmt->execute([$copy['copy_id'], $book['book_id'], $user['user_id'], $dueDate, $periodId]);
 
             // 7. Update Copy Status
             $stmt = $this->db->prepare("UPDATE BookCopies SET status = 'on_loan' WHERE copy_id = ?");
@@ -123,7 +137,6 @@ class CirculationController {
 
             $this->db->commit();
             $_SESSION['success'] = "Book '{$book['title']}' borrowed successfully! Due date: $dueDate";
-
         } catch (Exception $e) {
             $this->db->rollBack();
             $_SESSION['error'] = $e->getMessage();
@@ -132,10 +145,11 @@ class CirculationController {
         $this->redirectBack();
     }
 
-    private function processReturn() {
+    private function processReturn()
+    {
         $uniqueId = trim($_POST['user_id_input'] ?? '');
         $isbn = trim($_POST['book_id_input'] ?? '');
-        $condition = $_POST['condition'] ?? 'good'; 
+        $condition = $_POST['condition'] ?? 'good';
 
         if (empty($uniqueId) || empty($isbn)) {
             $_SESSION['error'] = "Please provide both User ID and Book ISBN to return.";
@@ -184,7 +198,7 @@ class CirculationController {
             // Check if overdue by date OR if "overdue" condition was manually selected
             $isOverdueByDate = (strtotime($returnDate) > strtotime($loan['due_date'] . ' 23:59:59'));
             $status = ($isOverdueByDate || $condition === 'overdue') ? 'overdue' : 'returned';
-            
+
             $stmt = $this->db->prepare("UPDATE BorrowingRecords SET return_date = ?, status = ? WHERE record_id = ?");
             $stmt->execute([$returnDate, $status, $loan['record_id']]);
 
@@ -192,7 +206,7 @@ class CirculationController {
             $newCopyStatus = 'available';
             if ($condition === 'damaged') $newCopyStatus = 'in_repair';
             if ($condition === 'lost') $newCopyStatus = 'lost';
-            
+
             $stmt = $this->db->prepare("UPDATE BookCopies SET status = ? WHERE copy_id = ?");
             $stmt->execute([$newCopyStatus, $loan['copy_id']]);
 
@@ -202,23 +216,23 @@ class CirculationController {
             $penaltyIncurred = false;
 
             if ($status === 'overdue') {
-                $penaltyAmount = 50.00; 
+                $penaltyAmount = 50.00;
                 $stmt = $this->db->prepare("INSERT INTO Penalties (user_id, record_id, amount, reason) VALUES (?, ?, ?, 'Overdue Fine')");
                 $stmt->execute([$user['user_id'], $loan['record_id'], $penaltyAmount]);
                 $messages[] = "Overdue fine of $50.00 applied.";
                 $penaltyIncurred = true;
             }
 
-            $basePrice = $book['price'] ?: 100.00; 
-            
+            $basePrice = $book['price'] ?: 100.00;
+
             if ($condition === 'damaged') {
-                $damageFee = $basePrice * 0.50; 
+                $damageFee = $basePrice * 0.50;
                 $stmt = $this->db->prepare("INSERT INTO Penalties (user_id, record_id, amount, reason) VALUES (?, ?, ?, 'Damaged Book Fee (50%)')");
                 $stmt->execute([$user['user_id'], $loan['record_id'], $damageFee]);
                 $messages[] = "Damage fee of $" . number_format($damageFee, 2) . " applied.";
                 $penaltyIncurred = true;
             } elseif ($condition === 'lost') {
-                $lostFee = $basePrice; 
+                $lostFee = $basePrice;
                 $stmt = $this->db->prepare("INSERT INTO Penalties (user_id, record_id, amount, reason) VALUES (?, ?, ?, 'Lost Book Replacement')");
                 $stmt->execute([$user['user_id'], $loan['record_id'], $lostFee]);
                 $messages[] = "Lost book fee of $" . number_format($lostFee, 2) . " applied.";
@@ -232,7 +246,6 @@ class CirculationController {
 
             $this->db->commit();
             $_SESSION['success'] = implode(" ", $messages);
-
         } catch (Exception $e) {
             $this->db->rollBack();
             $_SESSION['error'] = $e->getMessage();
@@ -241,7 +254,8 @@ class CirculationController {
         $this->redirectBack();
     }
 
-    private function checkClearance() {
+    private function checkClearance()
+    {
         $uniqueId = trim($_POST['clearance_user_id'] ?? '');
 
         if (empty($uniqueId)) {
@@ -270,7 +284,7 @@ class CirculationController {
             $alreadyCleared = ($user['is_cleared'] == 1);
 
             $_SESSION['clearance_data'] = [
-                'user_id' => $user['user_id'], 
+                'user_id' => $user['user_id'],
                 'unique_id' => $user['unique_id'],
                 'name' => $user['first_name'] . ' ' . $user['last_name'],
                 'loan_count' => $loanCount,
@@ -278,16 +292,16 @@ class CirculationController {
                 'is_eligible' => $isEligible,
                 'already_cleared' => $alreadyCleared
             ];
-
         } catch (Exception $e) {
             $_SESSION['error'] = $e->getMessage();
         }
         $this->redirectBack();
     }
 
-    private function processClearance() {
+    private function processClearance()
+    {
         $userId = $_POST['user_id'] ?? '';
-        
+
         if (empty($userId)) {
             $_SESSION['error'] = "Invalid User.";
             $this->redirectBack();
@@ -298,21 +312,21 @@ class CirculationController {
             $stmt->execute([$userId]);
 
             $_SESSION['success'] = "User has been officially marked as CLEARED.";
-            
+
             if (isset($_SESSION['clearance_data'])) {
                 $_SESSION['clearance_data']['is_cleared'] = true;
                 $_SESSION['clearance_data']['already_cleared'] = true;
                 $_SESSION['clearance_data']['is_eligible'] = true;
             }
-
         } catch (Exception $e) {
             $_SESSION['error'] = "Database error: " . $e->getMessage();
         }
-        
+
         $this->redirectBack();
     }
 
-    private function getUserPenaltiesJson() {
+    private function getUserPenaltiesJson()
+    {
         header('Content-Type: application/json');
         $userId = $_GET['user_id'] ?? '';
 
@@ -340,7 +354,7 @@ class CirculationController {
             $stmt->execute([$userId]);
             $penalties = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            foreach($penalties as &$p) {
+            foreach ($penalties as &$p) {
                 $p['date'] = date('M d, Y', strtotime($p['created_at']));
             }
 
@@ -353,7 +367,6 @@ class CirculationController {
                 ],
                 'penalties' => $penalties
             ]);
-
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'message' => 'Database error']);
         }
@@ -361,7 +374,8 @@ class CirculationController {
     }
 
     // NEW FUNCTION: Fetch Active Loans for Modal
-    private function getUserLoansJson() {
+    private function getUserLoansJson()
+    {
         header('Content-Type: application/json');
         $userId = $_GET['user_id'] ?? '';
 
@@ -396,7 +410,7 @@ class CirculationController {
             $stmt->execute([$userId]);
             $loans = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            foreach($loans as &$loan) {
+            foreach ($loans as &$loan) {
                 $loan['due_date_formatted'] = date('M d, Y', strtotime($loan['due_date']));
             }
 
@@ -408,14 +422,14 @@ class CirculationController {
                 ],
                 'loans' => $loans
             ]);
-
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'message' => 'Database error']);
         }
         exit();
     }
 
-    private function processPayAll() {
+    private function processPayAll()
+    {
         $userId = $_POST['user_id'] ?? '';
         $method = $_POST['payment_method'] ?? 'Cash';
 
@@ -443,13 +457,12 @@ class CirculationController {
 
                 $ins = $this->db->prepare("INSERT INTO Payments (penalty_id, user_id, amount_paid, method) VALUES (?, ?, ?, ?)");
                 $ins->execute([$p['penalty_id'], $userId, $p['amount'], $method]);
-                
+
                 $totalPaid += $p['amount'];
             }
 
             $this->db->commit();
             $_SESSION['success'] = "Successfully processed payment of $" . number_format($totalPaid, 2) . ". All penalties cleared.";
-
         } catch (Exception $e) {
             $this->db->rollBack();
             $_SESSION['error'] = "Payment failed: " . $e->getMessage();
@@ -459,7 +472,8 @@ class CirculationController {
         exit();
     }
 
-    private function redirectBack() {
+    private function redirectBack()
+    {
         if (isset($_SERVER['HTTP_REFERER'])) {
             header("Location: " . $_SERVER['HTTP_REFERER']);
         } else {
@@ -471,4 +485,3 @@ class CirculationController {
 
 $controller = new CirculationController($pdo);
 $controller->handleRequest();
-?>
